@@ -2,6 +2,8 @@
 
 5人のアニメAI社員が働く、転職活動向けのバーチャルオフィス・ポートフォリオです。React、TypeScript、Viteだけで動作するローカルファーストな第一版で、外部API、バックエンド、課金サービスは使用していません。
 
+公開URL：[https://salt-417.github.io/ai-office/](https://salt-417.github.io/ai-office/)
+
 ## 主な機能
 
 - 業務・移動・休憩・会議・夜間の5モード
@@ -46,6 +48,19 @@ npm run build
 ```
 
 本番用ファイルは `dist` フォルダに生成されます。
+
+## GitHub Pagesへのデプロイ
+
+`main`ブランチへpushすると、`.github/workflows/deploy.yml`が自動実行されます。ワークフローは次の順序で処理し、すべて成功した場合だけGitHub Pagesへ公開します。
+
+1. Node.jsのLTS版を準備
+2. `npm ci`でロックファイルどおりに依存関係をインストール
+3. 型チェック、ESLint、自動テストを実行
+4. `/ai-office/`をベースパスとして本番ビルド
+5. `dist`をGitHub Pages artifactとしてアップロード
+6. 公式の`actions/deploy-pages`で公開
+
+初回公開時は、GitHub上のリポジトリで **Settings → Pages → Build and deployment → Source** を **GitHub Actions** に設定してください。その後、`main`へのpushまたはActions画面の手動実行で公開されます。アクセストークンやAPIキーの追加は不要です。
 
 ## プロジェクト構成
 
