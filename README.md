@@ -1,6 +1,6 @@
 # AI OFFICE
 
-5人のアニメAI社員が働く、転職活動向けのバーチャルオフィス・ポートフォリオです。React、TypeScript、Viteだけで動作するローカルファーストな第一版で、外部API、バックエンド、課金サービスは使用していません。
+5人のアニメAI社員が働く、転職活動向けのバーチャルオフィス・ポートフォリオです。画面はReact、TypeScript、Viteで構築し、ローカル実行時のみExpressとOllamaを使ってマネージャーのレンへ仕事を依頼できます。外部AI API、クラウドバックエンド、課金サービスは使用していません。
 
 公開URL：[https://salt-417.github.io/ai-office/](https://salt-417.github.io/ai-office/)
 
@@ -13,6 +13,7 @@
 - モード、選択社員、社員進捗のlocalStorage保存
 - デスクトップとモバイルに対応したレスポンシブ表示
 - キーボード操作、フォーカス表示、ARIA、モーション軽減対応
+- ローカルOllama経由でレンが依頼を受け付けるExpress API
 
 ## Windowsでの起動手順
 
@@ -37,6 +38,64 @@ npm run dev
 ```
 
 PowerShellに表示された `http://localhost:5173/` をブラウザで開きます。終了するときはPowerShellで `Ctrl + C` を押します。
+
+## ローカルAI機能
+
+### 起動条件
+
+ローカルAI APIを利用するには、Node.jsに加えて[Ollama](https://ollama.com/)が必要です。Ollamaをインストールして起動し、初期モデルをPowerShellで取得してください。
+
+```powershell
+ollama pull qwen2.5:3b
+```
+
+その後、プロジェクトフォルダで次を実行します。`npm run dev`はViteとローカルExpress APIを同時に起動します。
+
+```powershell
+npm ci
+npm run dev
+```
+
+- Web画面：`http://localhost:5173/ai-office/`
+- ローカルAPI：`http://127.0.0.1:8787/api/manager`
+- Ollama API：`http://127.0.0.1:11434/api/chat`
+
+Express APIだけを起動する場合は次を使用します。
+
+```powershell
+npm run start:api
+```
+
+### API仕様
+
+`POST /api/manager`へJSONを送信します。依頼内容は1〜2000文字です。
+
+```json
+{
+  "task": "ポートフォリオの次の作業を整理してください"
+}
+```
+
+成功時はレンの返答を返します。
+
+```json
+{
+  "manager": "レン",
+  "reply": "依頼内容を確認しました。担当者候補は…"
+}
+```
+
+モデルなどを変更する場合は、`.env.example`に記載された環境変数をPowerShellで設定してから起動します。APIキーや秘密情報は不要です。
+
+```powershell
+$env:OLLAMA_MODEL = "qwen2.5:3b"
+$env:OLLAMA_TIMEOUT_MS = "30000"
+npm run dev
+```
+
+### GitHub Pages版について
+
+[GitHub Pages版](https://salt-417.github.io/ai-office/)は静的なデモ表示のみです。GitHub PagesはExpressやOllamaを実行しないため、`POST /api/manager`は利用できません。ローカルAI機能は、利用者のPC上でOllamaと`npm run dev`を起動した場合だけ動作します。現段階ではAI依頼用の画面UIも追加していません。
 
 ## 品質確認コマンド
 
@@ -69,6 +128,7 @@ npm run build
 - `src/hooks/`：localStorageとReact状態の同期
 - `src/types/`：社員、モード、保存状態の型定義
 - `src/utils/`：進捗計算などの純粋関数
+- `server/`：ローカル専用Express APIとOllama接続
 - `assets/`：承認済みの背景・キャラクター素材
 - `prototype/`：React化前の参照用試作
 
@@ -101,6 +161,7 @@ npm run build
 ## 第一版の対象外
 
 - ログイン、クラウドデータベース
-- 外部AI API、外部バックエンド
+- 外部AI API、クラウドバックエンド
 - 課金、複数ユーザー共有
-- GitHubへの公開やホスティング
+- GitHub Pages上でのローカルAI API実行
+- 他の4名への自動振り分けとAI依頼用画面UI
