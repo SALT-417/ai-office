@@ -7,17 +7,19 @@ import { OfficeScene } from './components/OfficeScene';
 import { TaskRequestSection } from './components/TaskRequestSection';
 import { WorkHistorySection } from './components/WorkHistorySection';
 import { ProjectAnalysisSection } from './components/ProjectAnalysisSection';
+import { PublicDemoOverview } from './components/PublicDemoOverview';
 import { employeeById, employees } from './data/employees';
 import { useManagerRequest } from './hooks/useManagerRequest';
 import { usePersistentOfficeState } from './hooks/usePersistentOfficeState';
 import { useWorkRequest } from './hooks/useWorkRequest';
 import { useWorkHistory } from './hooks/useWorkHistory';
 import { calculateOverallProgress } from './utils/progress';
+import { appRuntimeMode, type AppRuntimeMode } from './utils/runtimeMode';
 
-export function App() {
+export function App({ runtimeMode = appRuntimeMode }: { runtimeMode?: AppRuntimeMode }) {
   const { state, selectMode, selectEmployee, updateProgress } = usePersistentOfficeState();
-  const managerRequest = useManagerRequest();
-  const workRequest = useWorkRequest();
+  const managerRequest = useManagerRequest(runtimeMode);
+  const workRequest = useWorkRequest(runtimeMode);
   const history = useWorkHistory();
   const addHistoryExecution = history.addExecution;
   const [taskToRestore, setTaskToRestore] = useState<{ value: string; token: number } | null>(null);
@@ -32,14 +34,15 @@ export function App() {
     }
   }, [addHistoryExecution, managerRequest.response, workRequest.completionId, workRequest.response]);
   return <div className="app-shell">
-    <AppHeader progress={overallProgress} />
+    <AppHeader progress={overallProgress} runtimeMode={runtimeMode} />
     <main>
+      {runtimeMode === 'public-demo' && <PublicDemoOverview />}
       <ModeSwitcher activeMode={state.mode} onChange={selectMode} />
       <div className="workspace"><OfficeScene mode={state.mode} selectedId={state.selectedEmployeeId} progress={overallProgress} onSelect={selectEmployee} managerStatus={managerRequest.status} assignedEmployeeIds={assignedEmployeeIds} workStatus={workRequest.status} workResponse={workRequest.response} workTargetEmployeeIds={workRequest.targetEmployeeIds} /><EmployeePanel employee={selectedEmployee} mode={state.mode} progress={state.employeeProgress[state.selectedEmployeeId]} onProgressChange={(value) => updateProgress(state.selectedEmployeeId, value)} /></div>
       <EmployeeRoster selectedId={state.selectedEmployeeId} progress={state.employeeProgress} onSelect={selectEmployee} />
-      <TaskRequestSection status={managerRequest.status} response={managerRequest.response} error={managerRequest.error} onSubmit={(task) => { workRequest.reset(); return managerRequest.submit(task); }} onSelectEmployee={selectEmployee} workStatus={workRequest.status} workResponse={workRequest.response} workError={workRequest.error} onExecute={workRequest.execute} onCancelWork={workRequest.cancel} taskToRestore={taskToRestore} />
-      <ProjectAnalysisSection />
-      <WorkHistorySection entries={history.entries} selectedEntry={history.selectedEntry} storageError={history.storageError} onSelect={history.selectEntry} onReview={history.updateReview} onDeleteOne={history.removeOne} onDeleteAll={history.removeAll} onRestoreTask={(task) => setTaskToRestore((current) => ({ value: task, token: (current?.token ?? 0) + 1 }))} onSelectEmployee={selectEmployee} />
+      <TaskRequestSection runtimeMode={runtimeMode} status={managerRequest.status} response={managerRequest.response} error={managerRequest.error} onSubmit={(task) => { workRequest.reset(); return managerRequest.submit(task); }} onSelectEmployee={selectEmployee} workStatus={workRequest.status} workResponse={workRequest.response} workError={workRequest.error} onExecute={workRequest.execute} onCancelWork={workRequest.cancel} taskToRestore={taskToRestore} />
+      <ProjectAnalysisSection runtimeMode={runtimeMode} />
+      <WorkHistorySection runtimeMode={runtimeMode} entries={history.entries} selectedEntry={history.selectedEntry} storageError={history.storageError} onSelect={history.selectEntry} onReview={history.updateReview} onDeleteOne={history.removeOne} onDeleteAll={history.removeAll} onRestoreTask={(task) => setTaskToRestore((current) => ({ value: task, token: (current?.token ?? 0) + 1 }))} onSelectEmployee={selectEmployee} />
     </main>
     <footer><span>AI OFFICE</span><p>Planning · Design · Development · Quality</p><small>Local-first portfolio experience</small></footer>
   </div>;

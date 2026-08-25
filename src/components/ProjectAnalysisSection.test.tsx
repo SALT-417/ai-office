@@ -54,8 +54,9 @@ describe('ProjectAnalysisSection', () => {
   it('explains the static demo and never fetches project files', () => {
     const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock);
     render(<ProjectAnalysisSection isStaticDemo />);
-    expect(screen.getByText(/GitHub Pagesは静的デモ/)).toBeInTheDocument();
-    expect(screen.getByLabelText('分析目的')).toBeDisabled();
+    expect(screen.getByText(/公開版は固定サンプル/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('分析目的')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'サンプル分析を見る' })).toBeEnabled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

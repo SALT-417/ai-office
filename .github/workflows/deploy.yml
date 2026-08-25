@@ -39,6 +39,8 @@ jobs:
 
       - name: Build production site
         run: npm run build
+        env:
+          VITE_APP_RUNTIME_MODE: public-demo
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { EmployeeId } from '../types/office';
 import type { SpecialistEmployeeId, WorkRequestStatus, WorkResponse, WorkResult } from '../types/work';
 import { createHistoryId } from '../utils/workHistoryStorage';
+import { appRuntimeMode, type AppRuntimeMode } from '../utils/runtimeMode';
 
 const CLIENT_TIMEOUT_MS = 100_000;
 const specialistIds: SpecialistEmployeeId[] = ['mio', 'sou', 'yuna', 'aki'];
@@ -33,7 +34,7 @@ function safeError(value: unknown): string {
   return message && message.length <= 180 && !/stack|trace| at |error:/i.test(message) ? message : genericError;
 }
 
-export function useWorkRequest() {
+export function useWorkRequest(runtimeMode: AppRuntimeMode = appRuntimeMode) {
   const [status, setStatus] = useState<WorkRequestStatus>('idle');
   const [response, setResponse] = useState<WorkResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +73,7 @@ export function useWorkRequest() {
   };
 
   const execute = async (task: string, expectedEmployeeIds: EmployeeId[]) => {
+    if (runtimeMode === 'public-demo') return;
     controllerRef.current?.abort();
     const controller = new AbortController();
     const executionId = createHistoryId();

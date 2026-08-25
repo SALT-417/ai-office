@@ -4,6 +4,7 @@ import type { WorkHistoryEntry, ReviewStatus } from '../types/history';
 import type { EmployeeId } from '../types/office';
 import { MAX_REVIEW_NOTE_LENGTH } from '../utils/workHistoryStorage';
 import { SafeWorkContent } from './WorkResults';
+import type { AppRuntimeMode } from '../utils/runtimeMode';
 
 interface Props {
   entries: WorkHistoryEntry[];
@@ -15,6 +16,7 @@ interface Props {
   onDeleteAll: () => void;
   onRestoreTask: (task: string) => void;
   onSelectEmployee: (id: EmployeeId) => void;
+  runtimeMode?: AppRuntimeMode;
 }
 
 const reviewLabels: Record<ReviewStatus, string> = { pending: '○ 未確認', approved: '✓ 承認', rejected: '↩ 差し戻し' };
@@ -23,7 +25,7 @@ function formatJapanDate(value: string): string {
   return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 }
 
-export function WorkHistorySection({ entries, selectedEntry, storageError, onSelect, onReview, onDeleteOne, onDeleteAll, onRestoreTask, onSelectEmployee }: Props) {
+export function WorkHistorySection({ entries, selectedEntry, storageError, onSelect, onReview, onDeleteOne, onDeleteAll, onRestoreTask, onSelectEmployee, runtimeMode }: Props) {
   const [reviewNote, setReviewNote] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<'all' | string | null>(null);
   const [copyMessage, setCopyMessage] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
@@ -51,6 +53,7 @@ export function WorkHistorySection({ entries, selectedEntry, storageError, onSel
   return <section className="history-section" aria-labelledby="history-title">
     <div className="history-heading"><div><p className="eyebrow">HUMAN REVIEW</p><h2 id="history-title">作業履歴</h2><p>成果物と人による確認状態を、このブラウザ内だけに保存します。</p></div><button type="button" className="history-delete-all" onClick={() => setDeleteTarget('all')} disabled={entries.length === 0}>全履歴を削除</button></div>
     <p className="history-safety" role="note"><strong>保存と安全：</strong>履歴は使用中ブラウザのlocalStorageだけに保存され、GitHubや外部サーバーへ送信されません。秘密情報や個人情報は入力しないでください。AI成果物は提案であり、承認してもファイル変更・コマンド実行・Git操作・外部送信は行われません。</p>
+    {runtimeMode === 'public-demo' && <p className="demo-notice"><strong>固定サンプルとは別の一覧です。</strong> ここにはこのブラウザに保存された実作業履歴だけを表示し、サンプルの表示や操作は保存しません。</p>}
     {storageError && <p className="request-error" role="alert">{storageError}</p>}
     {copyMessage && <p className={copyMessage.kind === 'error' ? 'request-error' : 'history-copy-status'} role={copyMessage.kind === 'error' ? 'alert' : 'status'}>{copyMessage.text}</p>}
 

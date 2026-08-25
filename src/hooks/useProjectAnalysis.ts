@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AnalysisRequestStatus, AnalysisResponse, AnalysisSpecialist, ProjectFileInfo } from '../types/analysis';
+import { appRuntimeMode, type AppRuntimeMode } from '../utils/runtimeMode';
 
 const fallbackError = '分析できませんでした。ローカルAPIとOllamaの起動を確認してください。';
 
-export function useProjectAnalysis(isStaticDemo = import.meta.env.PROD) {
+export function useProjectAnalysis(modeOrStatic: AppRuntimeMode | boolean = appRuntimeMode) {
+  const isStaticDemo = typeof modeOrStatic === 'boolean' ? modeOrStatic : modeOrStatic === 'public-demo';
   const [files, setFiles] = useState<ProjectFileInfo[]>([]);
   const [filesError, setFilesError] = useState<string | null>(null);
   const [status, setStatus] = useState<AnalysisRequestStatus>('idle');
@@ -34,6 +36,7 @@ export function useProjectAnalysis(isStaticDemo = import.meta.env.PROD) {
   }, [isStaticDemo]);
 
   const analyze = useCallback(async (objective: string, specialist: AnalysisSpecialist, selectedFiles: string[]) => {
+    if (isStaticDemo) return;
     if (status === 'loading') return;
     controller.current?.abort();
     const current = new AbortController();
@@ -53,7 +56,7 @@ export function useProjectAnalysis(isStaticDemo = import.meta.env.PROD) {
         setStatus('error');
       }
     } finally { if (controller.current === current) controller.current = null; }
-  }, [status]);
+  }, [isStaticDemo, status]);
 
   const cancel = useCallback(() => controller.current?.abort(), []);
   return { files, filesError, status, response, error, completionId, loadFiles, analyze, cancel };

@@ -3,6 +3,8 @@ import { useAnalysisHistory } from '../hooks/useAnalysisHistory';
 import { useProjectAnalysis } from '../hooks/useProjectAnalysis';
 import type { AnalysisFinding, AnalysisHistoryEntry, AnalysisResponse, AnalysisSpecialist, ProjectFileCategory } from '../types/analysis';
 import type { ReviewStatus } from '../types/history';
+import { PUBLIC_DEMO_NOTICE, publicDemoAnalysis } from '../data/publicDemo';
+import type { AppRuntimeMode } from '../utils/runtimeMode';
 
 const categories: Array<[ProjectFileCategory, string]> = [['frontend', 'フロントエンド'], ['server', 'サーバー'], ['test', 'テスト'], ['config', '設定'], ['documentation', 'ドキュメント']];
 const severityLabels = { low: '低', medium: '中', high: '高' } as const;
@@ -17,8 +19,8 @@ function FindingCard({ finding, allowedFiles }: { finding: AnalysisFinding; allo
   </article>;
 }
 
-function Findings({ response }: { response: AnalysisResponse }) {
-  return <div className="analysis-result"><h3>{response.specialistName}の分析結果</h3><p>{response.summary}</p>
+function Findings({ response, isSample = false }: { response: AnalysisResponse; isSample?: boolean }) {
+  return <div className="analysis-result">{isSample && <p className="sample-disclaimer" role="status"><strong>固定サンプル</strong> — {PUBLIC_DEMO_NOTICE}</p>}<h3>{response.specialistName}の分析結果</h3><p>{response.summary}</p>
     {response.redacted && <p className="redaction-note" role="note">一部の秘密らしい値を伏せて分析しました。</p>}
     {response.findings.map((finding, index) => <FindingCard key={`${finding.title}-${index}`} finding={finding} allowedFiles={response.analyzedFiles} />)}
   </div>;
@@ -50,7 +52,8 @@ function AnalysisHistory({ history }: { history: ReturnType<typeof useAnalysisHi
   </div>;
 }
 
-export function ProjectAnalysisSection({ isStaticDemo = import.meta.env.PROD }: { isStaticDemo?: boolean }) {
+export function ProjectAnalysisSection({ isStaticDemo: staticOverride, runtimeMode }: { isStaticDemo?: boolean; runtimeMode?: AppRuntimeMode }) {
+  const isStaticDemo = staticOverride ?? runtimeMode === 'public-demo';
   const analysis = useProjectAnalysis(isStaticDemo);
   const history = useAnalysisHistory();
   const addAnalysisHistory = history.add;
@@ -58,6 +61,7 @@ export function ProjectAnalysisSection({ isStaticDemo = import.meta.env.PROD }: 
   const [specialist, setSpecialist] = useState<AnalysisSpecialist>('sou');
   const [selected, setSelected] = useState<string[]>([]);
   const [confirmed, setConfirmed] = useState(false);
+  const [sampleVisible, setSampleVisible] = useState(false);
   useEffect(() => { if (analysis.completionId && analysis.response) addAnalysisHistory(analysis.completionId, analysis.response); }, [addAnalysisHistory, analysis.completionId, analysis.response]);
   const size = useMemo(() => analysis.files.filter((file) => selected.includes(file.path)).reduce((sum, file) => sum + file.size, 0), [analysis.files, selected]);
   const oversizedFile = analysis.files.find((file) => selected.includes(file.path) && file.size > 20 * 1024);
@@ -67,13 +71,13 @@ export function ProjectAnalysisSection({ isStaticDemo = import.meta.env.PROD }: 
   const submit = (event: FormEvent) => { event.preventDefault(); if (confirmed && canConfirm) void analysis.analyze(objective.trim(), specialist, selected); };
   return <section className="project-analysis" aria-labelledby="project-analysis-title"><div className="request-heading"><div><p className="eyebrow">READ-ONLY LOCAL ANALYSIS</p><h2 id="project-analysis-title">プロジェクトを分析</h2><p>選択したソースだけをソウまたはアキが読み取り、根拠付きの改善提案を作ります。</p></div><span className={isStaticDemo ? 'environment-badge demo' : 'environment-badge local'}>{isStaticDemo ? '◌ 公開版では利用不可' : '● ローカル限定'}</span></div>
     <p className="safety-note"><strong>読み取り専用です。</strong> ファイル作成・変更・削除、コマンド実行、Git操作、外部送信は行いません。秘密検出は完全ではないため、選択ファイルを必ず確認してください。</p>
-    {isStaticDemo && <p className="demo-notice"><strong>GitHub Pagesは静的デモです。</strong> 分析にはPC上のExpressとローカルOllamaが必要です。ブラウザ内履歴は利用できます。</p>}
-    <form className="analysis-form" onSubmit={submit}><label htmlFor="analysis-objective">分析目的</label><textarea id="analysis-objective" maxLength={1000} value={objective} disabled={isStaticDemo || analysis.status === 'loading'} onChange={(event) => { setObjective(event.target.value); setConfirmed(false); }} placeholder="例：API通信の失敗処理とテスト不足を確認してください" rows={4} /><small>{objective.length}/1000文字</small>
+    {isStaticDemo && <div className="public-analysis-sample"><p className="demo-notice"><strong>公開版は固定サンプルです。</strong> APIへファイル一覧を要求しません。ローカル版では許可ファイルを明示選択し、ExpressとOllamaで実コードを分析できます。</p><h3>サンプル対象</h3><ul>{publicDemoAnalysis.analyzedFiles.map((path) => <li key={path}><code>{path}</code></li>)}</ul><div className="sample-controls"><button type="button" className="request-submit" onClick={() => setSampleVisible(true)}>サンプル分析を見る</button>{sampleVisible && <button type="button" className="cancel-button" onClick={() => setSampleVisible(false)}>サンプルを閉じる</button>}</div></div>}
+    {!isStaticDemo && <form className="analysis-form" onSubmit={submit}><label htmlFor="analysis-objective">分析目的</label><textarea id="analysis-objective" maxLength={1000} value={objective} disabled={analysis.status === 'loading'} onChange={(event) => { setObjective(event.target.value); setConfirmed(false); }} placeholder="例：API通信の失敗処理とテスト不足を確認してください" rows={4} /><small>{objective.length}/1000文字</small>
       <fieldset disabled={isStaticDemo || analysis.status === 'loading'}><legend>担当社員</legend><label><input type="radio" name="specialist" checked={specialist === 'sou'} onChange={() => { setSpecialist('sou'); setConfirmed(false); }} /> ソウ（技術分析）</label><label><input type="radio" name="specialist" checked={specialist === 'aki'} onChange={() => { setSpecialist('aki'); setConfirmed(false); }} /> アキ（品質分析）</label></fieldset>
       <div className="file-selection"><h3>分析対象ファイルを明示的に選択</h3>{analysis.files.length === 0 && !isStaticDemo && <button type="button" className="restore-task" onClick={() => void analysis.loadFiles()}>安全なファイル一覧を取得</button>}{analysis.filesError && <p role="alert" className="request-error">{analysis.filesError}</p>}{categories.map(([category, label]) => { const files = analysis.files.filter((file) => file.category === category); return files.length ? <fieldset key={category} disabled={isStaticDemo || analysis.status === 'loading'}><legend>{label}</legend>{files.map((file) => <label key={file.path}><input type="checkbox" checked={selected.includes(file.path)} onChange={() => changeSelection(file.path)} /><code>{file.path}</code><span>{formatBytes(file.size)}</span></label>)}</fieldset> : null; })}</div>
       <p className="selection-summary" aria-live="polite">選択：{selected.length}/8件 · 合計 {formatBytes(size)} / 60 KB</p>{limitError && <p role="alert" className="request-error">{limitError}</p>}
       {!confirmed ? <button type="button" className="request-submit" disabled={!canConfirm} onClick={() => setConfirmed(true)}>選択ファイルを確認</button> : <div className="analysis-confirm" role="group" aria-label="分析対象の最終確認"><h3>分析対象を確認してください</h3><p>担当：{specialist === 'sou' ? 'ソウ' : 'アキ'} ／ {selected.length}件</p><ul>{selected.map((item) => <li key={item}><code>{item}</code></li>)}</ul><button type="submit" className="request-submit" disabled={!canConfirm || analysis.status === 'loading'}>{analysis.status === 'loading' ? '分析中…' : '分析を開始'}</button></div>}
       {analysis.status === 'loading' && <div className="analysis-running" role="status"><span className="spinner" aria-hidden="true" />選択ファイルを読み取り、ローカルAIが分析しています。<button type="button" className="cancel-button" onClick={analysis.cancel}>キャンセル</button></div>}{analysis.error && <p role="alert" className="request-error">{analysis.error}</p>}
-    </form>{analysis.response && <Findings response={analysis.response} />}<p className="safety-note">AIの分析は提案です。利用前に人が根拠と内容を確認してください。承認しても自動実行されません。</p><AnalysisHistory history={history} />
+    </form>}{isStaticDemo && sampleVisible && <Findings response={publicDemoAnalysis} isSample />}{!isStaticDemo && analysis.response && <Findings response={analysis.response} />}<p className="safety-note">AIの分析は提案です。利用前に人が根拠と内容を確認してください。承認しても自動実行されません。</p>{isStaticDemo && <p className="demo-notice"><strong>履歴は固定サンプルと分離されています。</strong> 下の一覧はこのブラウザに保存された実分析履歴だけです。サンプルの表示や承認操作は保存しません。</p>}<AnalysisHistory history={history} />
   </section>;
 }

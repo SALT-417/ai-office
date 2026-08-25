@@ -100,8 +100,9 @@ describe('TaskRequestSection', () => {
 
   it('explains that the published build is a static demo', () => {
     render(<TaskRequestSection status="idle" response={null} error={null} onSubmit={vi.fn()} onSelectEmployee={vi.fn()} isStaticDemo />);
-    expect(screen.getByRole('note')).toHaveTextContent('公開版はデモ表示です');
+    expect(screen.getByRole('note')).toHaveTextContent('公開版は固定サンプルです');
     expect(screen.getByRole('button', { name: 'レンに依頼する' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'サンプル計画を見る' })).toBeEnabled();
   });
 });
 
@@ -241,9 +242,9 @@ describe('specialist work UI', () => {
     expect(screen.queryByText('担当社員がテキスト成果物を作成しています。画面を開いたままお待ちください。')).not.toBeInTheDocument();
   });
 
-  it('disables specialist execution in the published static demo', () => {
+  it('offers a fixed specialist sample in the published demo', () => {
     render(<TaskRequestSection status="success" response={apiResponse} error={null} onSubmit={vi.fn()} onSelectEmployee={vi.fn()} isStaticDemo />);
-    expect(screen.getByRole('button', { name: '担当社員に実行してもらう' })).toBeDisabled();
-    expect(screen.getByText('公開版は静的デモです。成果物の生成にはローカルOllamaが必要です。')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'サンプル成果物を見る' })).toBeEnabled();
+    expect(screen.getByText(/公開版では固定例を表示します/)).toBeInTheDocument();
   });
 });

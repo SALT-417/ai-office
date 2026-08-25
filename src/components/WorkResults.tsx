@@ -10,6 +10,8 @@ interface Props {
   onCancel: () => void;
   onSelectEmployee: (id: EmployeeId) => void;
   isStaticDemo: boolean;
+  onCloseSample?: () => void;
+  sampleTask?: string;
 }
 
 export function SafeWorkContent({ content }: { content: string }) {
@@ -22,14 +24,15 @@ export function SafeWorkContent({ content }: { content: string }) {
   })}</div>;
 }
 
-export function WorkResults({ status, response, error, onExecute, onCancel, onSelectEmployee, isStaticDemo }: Props) {
+export function WorkResults({ status, response, error, onExecute, onCancel, onSelectEmployee, isStaticDemo, onCloseSample, sampleTask }: Props) {
   const loading = status === 'loading';
   return <section className="work-execution" aria-labelledby="work-execution-title">
     <div className="execution-heading"><div><p className="eyebrow">SPECIALIST OUTPUT</p><h3 id="work-execution-title">専門社員の成果物</h3></div>
-      {!loading && <button type="button" className="execute-button" onClick={onExecute} disabled={isStaticDemo}>{response ? 'もう一度実行する' : '担当社員に実行してもらう'}</button>}
+      {!loading && (!isStaticDemo || !response) && <button type="button" className="execute-button" onClick={onExecute}>{isStaticDemo ? 'サンプル成果物を見る' : response ? 'もう一度実行する' : '担当社員に実行してもらう'}</button>}
+      {isStaticDemo && response && <button type="button" className="cancel-button" onClick={onCloseSample}>サンプル成果物を閉じる</button>}
       {loading && <button type="button" className="cancel-button" onClick={onCancel}>作業をキャンセル</button>}
     </div>
-    {isStaticDemo && <p className="execution-note" role="note">公開版は静的デモです。成果物の生成にはローカルOllamaが必要です。</p>}
+    {isStaticDemo && <><p className="execution-note" role="note">公開版では固定例を表示します。成果物の生成にはローカルOllamaが必要です。</p>{response && <p className="sample-disclaimer" role="status"><strong>固定サンプル</strong> — この結果は公開デモ用に用意した固定例で、現在AIが生成したものではありません。{sampleTask && <> 依頼例：{sampleTask}</>}</p>}</>}
     {!isStaticDemo && <p className="execution-note">処理は社員ごとに順番に行うため、担当人数やPCの性能によって時間がかかる場合があります。</p>}
     <p className="safety-note"><strong>安全上の注意：</strong>AIの出力は提案です。利用前に人が確認してください。現段階ではファイル変更・コマンド実行・Git操作・外部送信を行いません。</p>
     {loading && <p className="execution-status" role="status" aria-live="polite"><span className="spinner" aria-hidden="true" />担当社員がテキスト成果物を作成しています。画面を開いたままお待ちください。</p>}

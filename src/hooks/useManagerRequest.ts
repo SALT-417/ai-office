@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ManagerApiResponse, ManagerEmployeeName, ManagerRequestStatus } from '../types/manager';
+import { appRuntimeMode, type AppRuntimeMode } from '../utils/runtimeMode';
 
 const employeeNames: ManagerEmployeeName[] = ['レン', 'ミオ', 'ソウ', 'ユナ', 'アキ'];
 const CLIENT_TIMEOUT_MS = 35_000;
@@ -25,7 +26,7 @@ function safeErrorMessage(value: unknown): string {
   return message;
 }
 
-export function useManagerRequest() {
+export function useManagerRequest(runtimeMode: AppRuntimeMode = appRuntimeMode) {
   const [status, setStatus] = useState<ManagerRequestStatus>('idle');
   const [response, setResponse] = useState<ManagerApiResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +42,7 @@ export function useManagerRequest() {
   }, []);
 
   const submit = async (task: string) => {
+    if (runtimeMode === 'public-demo') return;
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
