@@ -8,6 +8,7 @@ import { PUBLIC_DEMO_NOTICE, publicDemoSamples } from '../data/publicDemo';
 import type { AppRuntimeMode } from '../utils/runtimeMode';
 import { WORK_CATEGORIES, workCategoryById, type WorkCategory } from '../../shared/workCategories';
 import { RequestTemplateList } from './RequestTemplateList';
+import { CustomRequestTemplates } from './CustomRequestTemplates';
 
 const MAX_TASK_LENGTH = 2_000;
 const employeeIdByName = Object.fromEntries(employees.map((employee) => [employee.name, employee.id])) as Record<ManagerEmployeeName, EmployeeId>;
@@ -83,6 +84,7 @@ export function TaskRequestSection({ status, response, error, onSubmit, onSelect
     {categoryStorageError && <p className="request-error" role="alert">{categoryStorageError}</p>}
 
     <RequestTemplateList category={category} disabled={categoryLocked} onSelect={applyTemplate} />
+    <CustomRequestTemplates category={category} prompt={task} disabled={categoryLocked} onSelect={applyTemplate} />
     <p className="template-notice" aria-live="polite">{templateNotice}</p>
 
     <div className={displayedResponse ? 'request-layout has-plan' : 'request-layout'}>

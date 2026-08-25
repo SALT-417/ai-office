@@ -1,5 +1,5 @@
 import { StrictMode } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from '../App';
 import type { WorkHistoryEntry } from '../types/history';
@@ -156,7 +156,10 @@ describe('work history integration', () => {
     fireEvent.keyDown(item, { key: 'Enter' });
     fireEvent.click(item);
     expect(item).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('note')).toHaveTextContent('GitHubや外部サーバーへ送信されません');
-    expect(screen.getByRole('note')).toHaveTextContent('承認してもファイル変更・コマンド実行・Git操作・外部送信は行われません');
+    const historySection = screen.getByRole('region', { name: '作業履歴' });
+    expect(within(historySection).getByRole('note')).toHaveTextContent('GitHubや外部サーバーへ送信されません');
+    expect(within(historySection).getByRole('note')).toHaveTextContent(
+      '承認してもファイル変更・コマンド実行・Git操作・外部送信は行われません',
+    );
   });
 });

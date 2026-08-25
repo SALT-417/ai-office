@@ -192,7 +192,7 @@ describe('TaskRequestSection', () => {
 
   it('explains that the published build is a static demo', () => {
     render(<TaskRequestSection status="idle" response={null} error={null} onSubmit={vi.fn()} onSelectEmployee={vi.fn()} isStaticDemo />);
-    expect(screen.getByRole('note')).toHaveTextContent('公開版は固定サンプルです');
+    expect(screen.getByText(/公開版は固定サンプルです/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'レンに依頼する' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'サンプル計画を見る' })).toBeEnabled();
   });

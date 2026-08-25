@@ -7,3 +7,13 @@ export interface RequestTemplate {
   description: string;
   prompt: string;
 }
+
+export interface CustomRequestTemplate {
+  id: string;
+  category: WorkCategory;
+  title: string;
+  prompt: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+}
