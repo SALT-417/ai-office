@@ -6,6 +6,7 @@ import { afterEach } from 'vitest';
 import { createApp } from './app';
 import { ManagerError, MAX_TASK_LENGTH, type ManagerReply } from './manager';
 import type { WorkResponse } from './work';
+import { ProjectAnalysisError, type AnalysisResponse, type AnalyzeRequest, type ProjectFileInfo } from './project-analysis';
 
 let server: Server | undefined;
 
@@ -106,6 +107,42 @@ describe('POST /api/work', () => {
     expect(response.status).toBe(500);
     expect(body).not.toContain('secret work stack');
     expect(body).not.toContain('stack');
+    consoleError.mockRestore();
+  });
+});
+
+describe('project analysis API', () => {
+  async function startAnalysisApi(projectFiles: () => Promise<ProjectFileInfo[]>, analysisReply: (input: AnalyzeRequest, signal?: AbortSignal) => Promise<AnalysisResponse>) {
+    server = createApp({ projectFiles, analysisReply }).listen(0, '127.0.0.1');
+    await new Promise<void>((resolve) => server?.once('listening', resolve));
+    const address = server.address() as AddressInfo;
+    return `http://127.0.0.1:${address.port}/api`;
+  }
+
+  it('returns only the injected relative file metadata and passes typed analysis input', async () => {
+    const files: ProjectFileInfo[] = [{ path: 'src/App.tsx', category: 'frontend', size: 100 }];
+    const result: AnalysisResponse = { specialist: 'sou', specialistName: 'ソウ', objective: '確認', analyzedFiles: ['src/App.tsx'], redacted: false, summary: '要約', findings: [{ title: '提案', severity: 'low', evidence: [{ path: 'src/App.tsx', line: 1, description: '根拠' }], recommendation: '改善', completionCriteria: ['完了'], verification: ['確認'] }] };
+    const analysisReply = vi.fn().mockResolvedValue(result);
+    const base = await startAnalysisApi(async () => files, analysisReply);
+    await expect((await fetch(`${base}/project-files`)).json()).resolves.toEqual({ files });
+    const response = await post(`${base}/analyze`, { objective: '確認', specialist: 'sou', files: ['src/App.tsx'], absolutePath: 'C:/secret' });
+    await expect(response.json()).resolves.toEqual(result);
+    expect(analysisReply).toHaveBeenCalledWith({ objective: '確認', specialist: 'sou', files: ['src/App.tsx'] }, expect.any(AbortSignal));
+  });
+
+  it('returns public validation errors and never exposes internal details or absolute paths', async () => {
+    const base = await startAnalysisApi(async () => [], async () => { throw new ProjectAnalysisError(400, '選択ファイルを確認してください。'); });
+    const response = await post(`${base}/analyze`, { objective: '', specialist: 'sou', files: [] });
+    const body = await response.text();
+    expect(response.status).toBe(400); expect(body).toContain('選択ファイルを確認してください'); expect(body).not.toMatch(/[A-Z]:\\|stack/i);
+  });
+
+  it('hides unexpected file-list and analysis errors', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const base = await startAnalysisApi(async () => { throw new Error('C:\\private\\secret'); }, async () => { throw new Error('internal stack'); });
+    const listBody = await (await fetch(`${base}/project-files`)).text();
+    const analysisBody = await (await post(`${base}/analyze`, { objective: 'x', specialist: 'aki', files: ['src/a.ts'] })).text();
+    expect(listBody).not.toContain('private'); expect(analysisBody).not.toContain('internal'); expect(analysisBody).not.toContain('stack');
     consoleError.mockRestore();
   });
 });

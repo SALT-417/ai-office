@@ -5,6 +5,7 @@ export interface ServerConfig {
   ollamaModel: string;
   timeoutMs: number;
   workTimeoutMs: number;
+  analysisTimeoutMs: number;
 }
 
 function readInteger(value: string | undefined, fallback: number, minimum: number, maximum: number): number {
@@ -20,5 +21,6 @@ export function getServerConfig(environment: NodeJS.ProcessEnv = process.env): S
     ollamaModel: environment.OLLAMA_MODEL?.trim() || 'qwen2.5:3b',
     timeoutMs: readInteger(environment.OLLAMA_TIMEOUT_MS, 30_000, 1_000, 120_000),
     workTimeoutMs: readInteger(environment.WORK_TIMEOUT_MS, 90_000, 5_000, 300_000),
+    analysisTimeoutMs: readInteger(environment.ANALYSIS_TIMEOUT_MS, 60_000, 5_000, 180_000),
   };
 }

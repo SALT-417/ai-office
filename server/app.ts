@@ -2,17 +2,22 @@ import express, { type ErrorRequestHandler } from 'express';
 import { getServerConfig, type ServerConfig } from './config';
 import { ManagerError, MAX_TASK_LENGTH, requestManagerReply, type ManagerReply } from './manager';
 import { requestWork, type WorkResponse } from './work';
+import { listProjectFiles, ProjectAnalysisError, requestProjectAnalysis, type AnalysisResponse, type AnalyzeRequest, type ProjectFileInfo } from './project-analysis';
 
 export interface AppDependencies {
   config?: ServerConfig;
   managerReply?: (task: string) => Promise<ManagerReply>;
   workReply?: (task: string, signal?: AbortSignal) => Promise<WorkResponse>;
+  projectFiles?: () => Promise<ProjectFileInfo[]>;
+  analysisReply?: (input: AnalyzeRequest, signal?: AbortSignal) => Promise<AnalysisResponse>;
 }
 
 export function createApp(dependencies: AppDependencies = {}) {
   const config = dependencies.config ?? getServerConfig();
   const managerReply = dependencies.managerReply ?? ((task: string) => requestManagerReply(task, config));
   const workReply = dependencies.workReply ?? ((task: string, signal?: AbortSignal) => requestWork(task, config, fetch, signal));
+  const projectFiles = dependencies.projectFiles ?? (() => listProjectFiles());
+  const analysisReply = dependencies.analysisReply ?? ((input: AnalyzeRequest, signal?: AbortSignal) => requestProjectAnalysis(input, config, fetch, signal));
   const app = express();
 
   app.disable('x-powered-by');
@@ -74,6 +79,35 @@ export function createApp(dependencies: AppDependencies = {}) {
     } catch (error) {
       console.error('[AI OFFICE API] Work request failed:', error instanceof Error ? error.message : 'Unknown error');
       response.status(500).json({ error: '成果物の作成中に問題が発生しました。時間をおいて再度お試しください。' });
+    }
+  });
+
+  app.get('/api/project-files', async (_request, response) => {
+    try {
+      response.json({ files: await projectFiles() });
+    } catch (error) {
+      console.error('[AI OFFICE API] Project file listing failed:', error instanceof Error ? error.message : 'Unknown error');
+      response.status(500).json({ error: '分析対象ファイルの一覧を取得できませんでした。' });
+    }
+  });
+
+  app.post('/api/analyze', async (request, response) => {
+    const controller = new AbortController();
+    request.once('aborted', () => controller.abort());
+    response.once('close', () => { if (!response.writableEnded) controller.abort(); });
+    try {
+      response.json(await analysisReply({
+        objective: request.body?.objective,
+        specialist: request.body?.specialist,
+        files: request.body?.files,
+      }, controller.signal));
+    } catch (error) {
+      if (error instanceof ProjectAnalysisError) {
+        response.status(error.status).json({ error: error.publicMessage });
+        return;
+      }
+      console.error('[AI OFFICE API] Project analysis failed:', error instanceof Error ? error.message : 'Unknown error');
+      response.status(500).json({ error: '分析中に問題が発生しました。時間をおいて再度お試しください。' });
     }
   });
 

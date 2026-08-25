@@ -6,6 +6,7 @@ import { ModeSwitcher } from './components/ModeSwitcher';
 import { OfficeScene } from './components/OfficeScene';
 import { TaskRequestSection } from './components/TaskRequestSection';
 import { WorkHistorySection } from './components/WorkHistorySection';
+import { ProjectAnalysisSection } from './components/ProjectAnalysisSection';
 import { employeeById, employees } from './data/employees';
 import { useManagerRequest } from './hooks/useManagerRequest';
 import { usePersistentOfficeState } from './hooks/usePersistentOfficeState';
@@ -37,6 +38,7 @@ export function App() {
       <div className="workspace"><OfficeScene mode={state.mode} selectedId={state.selectedEmployeeId} progress={overallProgress} onSelect={selectEmployee} managerStatus={managerRequest.status} assignedEmployeeIds={assignedEmployeeIds} workStatus={workRequest.status} workResponse={workRequest.response} workTargetEmployeeIds={workRequest.targetEmployeeIds} /><EmployeePanel employee={selectedEmployee} mode={state.mode} progress={state.employeeProgress[state.selectedEmployeeId]} onProgressChange={(value) => updateProgress(state.selectedEmployeeId, value)} /></div>
       <EmployeeRoster selectedId={state.selectedEmployeeId} progress={state.employeeProgress} onSelect={selectEmployee} />
       <TaskRequestSection status={managerRequest.status} response={managerRequest.response} error={managerRequest.error} onSubmit={(task) => { workRequest.reset(); return managerRequest.submit(task); }} onSelectEmployee={selectEmployee} workStatus={workRequest.status} workResponse={workRequest.response} workError={workRequest.error} onExecute={workRequest.execute} onCancelWork={workRequest.cancel} taskToRestore={taskToRestore} />
+      <ProjectAnalysisSection />
       <WorkHistorySection entries={history.entries} selectedEntry={history.selectedEntry} storageError={history.storageError} onSelect={history.selectEntry} onReview={history.updateReview} onDeleteOne={history.removeOne} onDeleteAll={history.removeAll} onRestoreTask={(task) => setTaskToRestore((current) => ({ value: task, token: (current?.token ?? 0) + 1 }))} onSelectEmployee={selectEmployee} />
     </main>
     <footer><span>AI OFFICE</span><p>Planning · Design · Development · Quality</p><small>Local-first portfolio experience</small></footer>
