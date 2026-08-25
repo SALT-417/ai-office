@@ -4,8 +4,9 @@ import type { EmployeeId } from '../types/office';
 import type { ManagerApiResponse, ManagerEmployeeName, ManagerRequestStatus } from '../types/manager';
 import type { WorkRequestStatus, WorkResponse } from '../types/work';
 import { WorkResults } from './WorkResults';
-import { PUBLIC_DEMO_NOTICE, publicDemoPlan, publicDemoTask, publicDemoWork } from '../data/publicDemo';
+import { PUBLIC_DEMO_NOTICE, publicDemoSamples } from '../data/publicDemo';
 import type { AppRuntimeMode } from '../utils/runtimeMode';
+import { WORK_CATEGORIES, workCategoryById, type WorkCategory } from '../../shared/workCategories';
 
 const MAX_TASK_LENGTH = 2_000;
 const employeeIdByName = Object.fromEntries(employees.map((employee) => [employee.name, employee.id])) as Record<ManagerEmployeeName, EmployeeId>;
@@ -14,33 +15,40 @@ interface Props {
   status: ManagerRequestStatus;
   response: ManagerApiResponse | null;
   error: string | null;
-  onSubmit: (task: string) => Promise<void>;
+  onSubmit: (task: string, category: WorkCategory) => Promise<void>;
   onSelectEmployee: (id: EmployeeId) => void;
   workStatus?: WorkRequestStatus;
   workResponse?: WorkResponse | null;
   workError?: string | null;
-  onExecute?: (task: string, employeeIds: EmployeeId[]) => void;
+  onExecute?: (task: string, employeeIds: EmployeeId[], category: WorkCategory) => void;
   onCancelWork?: () => void;
-  taskToRestore?: { value: string; token: number } | null;
+  taskToRestore?: { value: string; category: WorkCategory; token: number } | null;
   isStaticDemo?: boolean;
   runtimeMode?: AppRuntimeMode;
+  category?: WorkCategory;
+  categoryStorageError?: string | null;
+  onCategoryChange?: (category: WorkCategory) => void;
 }
 
-export function TaskRequestSection({ status, response, error, onSubmit, onSelectEmployee, workStatus = 'idle', workResponse = null, workError = null, onExecute = () => undefined, onCancelWork = () => undefined, taskToRestore = null, isStaticDemo: staticOverride, runtimeMode }: Props) {
+export function TaskRequestSection({ status, response, error, onSubmit, onSelectEmployee, workStatus = 'idle', workResponse = null, workError = null, onExecute = () => undefined, onCancelWork = () => undefined, taskToRestore = null, isStaticDemo: staticOverride, runtimeMode, category = 'general', categoryStorageError = null, onCategoryChange = () => undefined }: Props) {
   const isStaticDemo = staticOverride ?? runtimeMode === 'public-demo';
   const [task, setTask] = useState('');
   const [plannedTask, setPlannedTask] = useState('');
   const [samplePlanVisible, setSamplePlanVisible] = useState(false);
   const [sampleWorkVisible, setSampleWorkVisible] = useState(false);
+  const [categoryChanged, setCategoryChanged] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const normalizedTask = task.trim();
   const isLoading = status === 'loading';
   const isDisabled = normalizedTask.length === 0 || isLoading || isStaticDemo;
-  const displayedResponse = isStaticDemo && samplePlanVisible ? publicDemoPlan : response;
+  const sample = publicDemoSamples[category];
+  const displayedResponse = isStaticDemo && samplePlanVisible ? sample.plan : response;
+  const categoryLocked = isLoading || workStatus === 'loading';
 
   useEffect(() => {
     if (!taskToRestore) return;
     setTask(taskToRestore.value);
+    setCategoryChanged(false);
     textareaRef.current?.focus();
   }, [taskToRestore]);
 
@@ -48,7 +56,8 @@ export function TaskRequestSection({ status, response, error, onSubmit, onSelect
     event.preventDefault();
     if (!isDisabled) {
       setPlannedTask(normalizedTask);
-      void onSubmit(normalizedTask);
+      setCategoryChanged(false);
+      void onSubmit(normalizedTask, category);
     }
   };
 
@@ -59,6 +68,9 @@ export function TaskRequestSection({ status, response, error, onSubmit, onSelect
     </div>
 
     {isStaticDemo && <><p className="demo-notice" role="note"><strong>公開版は固定サンプルです。</strong> APIやOllamaへ通信しません。ローカル版ではPC上のOllamaとExpressを使って実際の計画を生成できます。</p><div className="sample-controls"><button type="button" className="request-submit" onClick={() => { setSamplePlanVisible(true); setSampleWorkVisible(false); }}>{samplePlanVisible ? 'サンプル計画を最初から見る' : 'サンプル計画を見る'}</button>{samplePlanVisible && <button type="button" className="cancel-button" onClick={() => { setSamplePlanVisible(false); setSampleWorkVisible(false); }}>サンプルを閉じる</button>}</div></>}
+
+    <fieldset className="work-category-selector" disabled={categoryLocked}><legend>業務カテゴリ</legend><div role="radiogroup" aria-label="業務カテゴリ">{WORK_CATEGORIES.map((item) => <label className={category === item.id ? 'active' : ''} key={item.id}><input type="radio" name="work-category" value={item.id} checked={category === item.id} onChange={() => { setPlannedTask(''); setSamplePlanVisible(false); setSampleWorkVisible(false); setCategoryChanged(true); onCategoryChange(item.id); }} /><span>{item.label}</span></label>)}</div><p><strong>{workCategoryById[category].label}：</strong>{workCategoryById[category].description}</p><small>依頼例：{workCategoryById[category].example}</small>{categoryChanged && normalizedTask && <em aria-live="polite">依頼文は残しています。カテゴリ変更後は内容を確認してから送信してください。</em>}</fieldset>
+    {categoryStorageError && <p className="request-error" role="alert">{categoryStorageError}</p>}
 
     <div className={displayedResponse ? 'request-layout has-plan' : 'request-layout'}>
       <form className="request-form" onSubmit={handleSubmit}>
@@ -81,7 +93,7 @@ export function TaskRequestSection({ status, response, error, onSubmit, onSelect
           return <button type="button" className="assignment-card" key={assignment.name} onClick={() => onSelectEmployee(id)} aria-label={`${employee.name}の社員詳細を表示`}><img src={employee.image} alt="" /><span><strong>{employee.name}<small>{employee.role}</small></strong><p>{assignment.task}</p></span><b aria-hidden="true">→</b></button>;
         })}</div></div>
         <div className="plan-block"><h4>最初に着手する具体的な作業</h4><ol>{displayedResponse.plan.firstActions.map((action) => <li key={action}>{action}</li>)}</ol></div>
-        <WorkResults status={isStaticDemo ? 'idle' : workStatus} response={isStaticDemo && sampleWorkVisible ? publicDemoWork : workResponse} error={isStaticDemo ? null : workError} onExecute={() => isStaticDemo ? setSampleWorkVisible(true) : onExecute(plannedTask, displayedResponse.plan.assignments.filter((assignment) => assignment.name !== 'レン').map((assignment) => employeeIdByName[assignment.name]))} onCancel={onCancelWork} onSelectEmployee={onSelectEmployee} isStaticDemo={isStaticDemo} onCloseSample={() => setSampleWorkVisible(false)} sampleTask={publicDemoTask} />
+        <WorkResults status={isStaticDemo ? 'idle' : workStatus} response={isStaticDemo && sampleWorkVisible ? sample.work : workResponse} error={isStaticDemo ? null : workError} onExecute={() => isStaticDemo ? setSampleWorkVisible(true) : onExecute(plannedTask, displayedResponse.plan.assignments.filter((assignment) => assignment.name !== 'レン').map((assignment) => employeeIdByName[assignment.name]), category)} onCancel={onCancelWork} onSelectEmployee={onSelectEmployee} isStaticDemo={isStaticDemo} onCloseSample={() => setSampleWorkVisible(false)} sampleTask={sample.task} />
       </div>}
     </div>
   </section>;

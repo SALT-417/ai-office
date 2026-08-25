@@ -3,19 +3,20 @@ import { getServerConfig, type ServerConfig } from './config';
 import { ManagerError, MAX_TASK_LENGTH, requestManagerReply, type ManagerReply } from './manager';
 import { requestWork, type WorkResponse } from './work';
 import { listProjectFiles, ProjectAnalysisError, requestProjectAnalysis, type AnalysisResponse, type AnalyzeRequest, type ProjectFileInfo } from './project-analysis';
+import { isWorkCategory, type WorkCategory } from '../shared/workCategories';
 
 export interface AppDependencies {
   config?: ServerConfig;
-  managerReply?: (task: string) => Promise<ManagerReply>;
-  workReply?: (task: string, signal?: AbortSignal) => Promise<WorkResponse>;
+  managerReply?: (task: string, category?: WorkCategory) => Promise<ManagerReply>;
+  workReply?: (task: string, signal?: AbortSignal, category?: WorkCategory) => Promise<WorkResponse>;
   projectFiles?: () => Promise<ProjectFileInfo[]>;
   analysisReply?: (input: AnalyzeRequest, signal?: AbortSignal) => Promise<AnalysisResponse>;
 }
 
 export function createApp(dependencies: AppDependencies = {}) {
   const config = dependencies.config ?? getServerConfig();
-  const managerReply = dependencies.managerReply ?? ((task: string) => requestManagerReply(task, config));
-  const workReply = dependencies.workReply ?? ((task: string, signal?: AbortSignal) => requestWork(task, config, fetch, signal));
+  const managerReply = dependencies.managerReply ?? ((task: string, category: WorkCategory = 'general') => requestManagerReply(task, config, fetch, category));
+  const workReply = dependencies.workReply ?? ((task: string, signal?: AbortSignal, category: WorkCategory = 'general') => requestWork(task, config, fetch, signal, category));
   const projectFiles = dependencies.projectFiles ?? (() => listProjectFiles());
   const analysisReply = dependencies.analysisReply ?? ((input: AnalyzeRequest, signal?: AbortSignal) => requestProjectAnalysis(input, config, fetch, signal));
   const app = express();
@@ -25,6 +26,8 @@ export function createApp(dependencies: AppDependencies = {}) {
 
   app.post('/api/manager', async (request, response) => {
     const task = request.body?.task;
+    const category: WorkCategory = request.body?.category === undefined ? 'general' : request.body.category;
+    if (!isWorkCategory(category)) { response.status(400).json({ error: 'categoryの値が正しくありません。' }); return; }
     if (typeof task !== 'string') {
       response.status(400).json({ error: 'taskには文字列を指定してください。' });
       return;
@@ -41,8 +44,8 @@ export function createApp(dependencies: AppDependencies = {}) {
     }
 
     try {
-      const result = await managerReply(normalizedTask);
-      response.json({ manager: 'レン', reply: result.reply, plan: result.plan });
+      const result = await managerReply(normalizedTask, category);
+      response.json({ manager: 'レン', category, reply: result.reply, plan: result.plan });
     } catch (error) {
       if (error instanceof ManagerError) {
         const status = error.code === 'OLLAMA_TIMEOUT' ? 504 : 503;
@@ -56,6 +59,8 @@ export function createApp(dependencies: AppDependencies = {}) {
 
   app.post('/api/work', async (request, response) => {
     const task = request.body?.task;
+    const category: WorkCategory = request.body?.category === undefined ? 'general' : request.body.category;
+    if (!isWorkCategory(category)) { response.status(400).json({ error: 'categoryの値が正しくありません。' }); return; }
     if (typeof task !== 'string') {
       response.status(400).json({ error: 'taskには文字列を指定してください。' });
       return;
@@ -75,7 +80,7 @@ export function createApp(dependencies: AppDependencies = {}) {
       response.once('close', () => {
         if (!response.writableEnded) controller.abort();
       });
-      response.json(await workReply(normalizedTask, controller.signal));
+      response.json(await workReply(normalizedTask, controller.signal, category));
     } catch (error) {
       console.error('[AI OFFICE API] Work request failed:', error instanceof Error ? error.message : 'Unknown error');
       response.status(500).json({ error: '成果物の作成中に問題が発生しました。時間をおいて再度お試しください。' });

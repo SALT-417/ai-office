@@ -13,8 +13,10 @@ export interface ManagerPlan {
 
 export interface ManagerApiResponse {
   manager: 'レン';
+  category: WorkCategory;
   reply: string;
   plan: ManagerPlan;
 }
 
 export type ManagerRequestStatus = 'idle' | 'loading' | 'success' | 'error';
+import type { WorkCategory } from '../../shared/workCategories';

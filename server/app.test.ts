@@ -15,7 +15,7 @@ afterEach(async () => {
   server = undefined;
 });
 
-async function startApi(managerReply: (task: string) => Promise<ManagerReply>) {
+async function startApi(managerReply: (task: string, category?: import('../shared/workCategories').WorkCategory) => Promise<ManagerReply>) {
   server = createApp({ managerReply }).listen(0, '127.0.0.1');
   await new Promise<void>((resolve) => server?.once('listening', resolve));
   const address = server.address() as AddressInfo;
@@ -29,13 +29,24 @@ async function post(url: string, body: unknown) {
 describe('POST /api/manager', () => {
   it('normalizes a task and returns Ren reply', async () => {
     const plan = { summary: '品質確認の依頼です。', assignments: [{ name: 'アキ' as const, task: 'テスト、品質、アクセシビリティ' }], firstActions: ['確認項目を作る。', '主要操作を確認する。'] };
-    const managerReply = vi.fn().mockResolvedValue({ reply: '整形済みの返答', plan });
+    const managerReply = vi.fn().mockResolvedValue({ category: 'general', reply: '整形済みの返答', plan });
     const url = await startApi(managerReply);
     const response = await post(url, { task: '  品質を確認してください  ' });
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ manager: 'レン', reply: '整形済みの返答', plan });
-    expect(managerReply).toHaveBeenCalledWith('品質を確認してください');
+    await expect(response.json()).resolves.toEqual({ manager: 'レン', category: 'general', reply: '整形済みの返答', plan });
+    expect(managerReply).toHaveBeenCalledWith('品質を確認してください', 'general');
+  });
+
+  it('passes an explicit category and rejects unknown values', async () => {
+    const plan = { summary: '学習計画', assignments: [], firstActions: ['目標を決める', '演習を選ぶ'] };
+    const managerReply = vi.fn().mockResolvedValue({ category: 'learning', reply: '返答', plan });
+    const url = await startApi(managerReply);
+    expect((await post(url, { task: 'Reactを学ぶ', category: 'learning' })).status).toBe(200);
+    expect(managerReply).toHaveBeenCalledWith('Reactを学ぶ', 'learning');
+    const invalid = await post(url, { task: 'Reactを学ぶ', category: 'unknown' });
+    expect(invalid.status).toBe(400);
+    await expect(invalid.json()).resolves.toEqual({ error: 'categoryの値が正しくありません。' });
   });
 
   it.each([
@@ -78,13 +89,13 @@ describe('POST /api/work', () => {
   }
 
   it('normalizes the task and returns structured employee results', async () => {
-    const result: WorkResponse = { coordinator: 'レン', task: '品質を確認する', results: [{ employeeId: 'aki', name: 'アキ', role: 'テスト、品質、アクセシビリティ', status: 'completed', title: '確認表', content: '確認項目' }] };
+    const result: WorkResponse = { coordinator: 'レン', category: 'general', task: '品質を確認する', results: [{ employeeId: 'aki', name: 'アキ', role: 'テスト、品質、アクセシビリティ', status: 'completed', title: '確認表', content: '確認項目' }] };
     const workReply = vi.fn().mockResolvedValue(result);
     const url = await startWorkApi(workReply);
     const response = await post(url, { task: '  品質を確認する  ', assignments: [{ name: 'レン', role: '広告担当' }] });
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual(result);
-    expect(workReply).toHaveBeenCalledWith('品質を確認する', expect.any(AbortSignal));
+    expect(workReply).toHaveBeenCalledWith('品質を確認する', expect.any(AbortSignal), 'general');
   });
 
   it.each([

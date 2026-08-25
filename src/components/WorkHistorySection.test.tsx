@@ -9,11 +9,11 @@ import { STORAGE_KEY as OFFICE_STORAGE_KEY } from '../hooks/usePersistentOfficeS
 import { WORK_HISTORY_STORAGE_KEY } from '../utils/workHistoryStorage';
 
 const task = 'AI OFFICEのAPI改善を整理してください';
-const managerResponse: ManagerApiResponse = { manager: 'レン', reply: '計画', plan: { summary: 'API改善の計画です。', assignments: [{ name: 'ソウ', task: 'AI・Web開発、技術実装' }], firstActions: ['既存APIを整理する', 'テスト条件を決める'] } };
-const workResponse: WorkResponse = { coordinator: 'レン', task, results: [{ employeeId: 'sou', name: 'ソウ', role: 'AI開発担当', status: 'completed', title: '実装計画', content: '# 現在の構成\n<img src=x onerror=alert(1)>\n- Vitestで確認する' }] };
+const managerResponse: ManagerApiResponse = { manager: 'レン', category: 'development', reply: '計画', plan: { summary: 'API改善の計画です。', assignments: [{ name: 'ソウ', task: 'AI・Web開発、技術実装' }], firstActions: ['既存APIを整理する', 'テスト条件を決める'] } };
+const workResponse: WorkResponse = { coordinator: 'レン', category: 'development', task, results: [{ employeeId: 'sou', name: 'ソウ', role: 'AI開発担当', status: 'completed', title: '実装計画', content: '# 現在の構成\n<img src=x onerror=alert(1)>\n- Vitestで確認する' }] };
 
 function historyEntry(id = 'saved-1', overrides: Partial<WorkHistoryEntry> = {}): WorkHistoryEntry {
-  return { id, createdAt: '2026-08-25T10:00:00.000Z', updatedAt: '2026-08-25T10:00:00.000Z', task, plan: managerResponse.plan, results: workResponse.results, reviewStatus: 'pending', reviewNote: '', ...overrides };
+  return { id, createdAt: '2026-08-25T10:00:00.000Z', updatedAt: '2026-08-25T10:00:00.000Z', category: 'development', task, plan: managerResponse.plan, results: workResponse.results, reviewStatus: 'pending', reviewNote: '', ...overrides };
 }
 
 function seed(entries: WorkHistoryEntry[]) {
@@ -111,6 +111,7 @@ describe('work history integration', () => {
     await user.click(screen.getByRole('button', { name: '同じ依頼を入力欄へ戻す' }));
     expect(screen.getByLabelText('レンへの依頼内容')).toHaveValue(task);
     expect(screen.getByLabelText('レンへの依頼内容')).toHaveFocus();
+    expect(screen.getByRole('radio', { name: 'ソフトウェア開発' })).toBeChecked();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

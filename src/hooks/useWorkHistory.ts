@@ -3,6 +3,7 @@ import type { ManagerPlan } from '../types/manager';
 import type { ReviewStatus, WorkHistoryEntry } from '../types/history';
 import type { WorkResult } from '../types/work';
 import { createHistoryId, loadWorkHistory, MAX_HISTORY_ENTRIES, saveWorkHistory } from '../utils/workHistoryStorage';
+import type { WorkCategory } from '../../shared/workCategories';
 
 const storageErrorMessage = '作業履歴をブラウザへ保存できませんでした。現在の成果物は画面で確認できます。ブラウザの保存容量を確認してください。';
 
@@ -24,11 +25,11 @@ export function useWorkHistory() {
     }
   }, []);
 
-  const addExecution = useCallback((executionId: string, task: string, plan: ManagerPlan, results: WorkResult[]) => {
+  const addExecution = useCallback((executionId: string, category: WorkCategory, task: string, plan: ManagerPlan, results: WorkResult[]) => {
     if (!executionId || handledExecutionIds.current.has(executionId) || entries.some((entry) => entry.id === executionId)) return;
     handledExecutionIds.current.add(executionId);
     const now = new Date().toISOString();
-    const entry: WorkHistoryEntry = { id: executionId || createHistoryId(), createdAt: now, updatedAt: now, task, plan, results, reviewStatus: 'pending', reviewNote: '' };
+    const entry: WorkHistoryEntry = { id: executionId || createHistoryId(), createdAt: now, updatedAt: now, category, task, plan, results, reviewStatus: 'pending', reviewNote: '' };
     const next = [entry, ...entries].slice(0, MAX_HISTORY_ENTRIES);
     commit(next);
   }, [commit, entries]);

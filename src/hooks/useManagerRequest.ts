@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ManagerApiResponse, ManagerEmployeeName, ManagerRequestStatus } from '../types/manager';
 import { appRuntimeMode, type AppRuntimeMode } from '../utils/runtimeMode';
+import { isWorkCategory, type WorkCategory } from '../../shared/workCategories';
 
 const employeeNames: ManagerEmployeeName[] = ['レン', 'ミオ', 'ソウ', 'ユナ', 'アキ'];
 const CLIENT_TIMEOUT_MS = 35_000;
@@ -10,6 +11,7 @@ function isManagerResponse(value: unknown): value is ManagerApiResponse {
   if (typeof value !== 'object' || value === null) return false;
   const response = value as Partial<ManagerApiResponse>;
   return response.manager === 'レン'
+    && isWorkCategory(response.category)
     && typeof response.reply === 'string'
     && typeof response.plan?.summary === 'string'
     && Array.isArray(response.plan.assignments)
@@ -41,7 +43,7 @@ export function useManagerRequest(runtimeMode: AppRuntimeMode = appRuntimeMode) 
     };
   }, []);
 
-  const submit = async (task: string) => {
+  const submit = async (task: string, category: WorkCategory = 'general') => {
     if (runtimeMode === 'public-demo') return;
     controllerRef.current?.abort();
     const controller = new AbortController();
@@ -55,7 +57,7 @@ export function useManagerRequest(runtimeMode: AppRuntimeMode = appRuntimeMode) 
       const apiResponse = await fetch('/api/manager', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task }),
+        body: JSON.stringify({ category, task }),
         signal: controller.signal,
       });
       const body: unknown = await apiResponse.json().catch(() => null);
@@ -78,5 +80,10 @@ export function useManagerRequest(runtimeMode: AppRuntimeMode = appRuntimeMode) 
     }
   };
 
-  return { status, response, error, submit };
+  const reset = () => {
+    controllerRef.current?.abort(); controllerRef.current = null;
+    setStatus('idle'); setResponse(null); setError(null);
+  };
+
+  return { status, response, error, submit, reset };
 }

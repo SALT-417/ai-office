@@ -9,6 +9,7 @@ import { TaskRequestSection } from './TaskRequestSection';
 const task = 'AIエンジニアへの転職に向けて、次の作業を整理してください';
 const apiResponse: ManagerApiResponse = {
   manager: 'レン',
+  category: 'general',
   reply: '整形済みの計画',
   plan: {
     summary: 'AI OFFICEを転職用ポートフォリオとして改善する依頼です。',
@@ -21,6 +22,7 @@ const apiResponse: ManagerApiResponse = {
 };
 const workApiResponse: WorkResponse = {
   coordinator: 'レン',
+  category: 'general',
   task,
   results: [
     { employeeId: 'mio', name: 'ミオ', role: 'キャリア設計、求人・企業分析、応募資料', status: 'completed', title: '応募準備チェックリスト', content: '# 最初の確認\n- 求人要件を整理する\n- 実績と対応付ける' },
@@ -56,12 +58,43 @@ describe('TaskRequestSection', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
     const [url, options] = fetchMock.mock.calls[0];
     expect(url).toBe('/api/manager');
-    expect(JSON.parse(String(options?.body))).toEqual({ task });
+    expect(JSON.parse(String(options?.body))).toEqual({ category: 'general', task });
     expect(await screen.findByText(apiResponse.plan.summary)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '担当者と担当内容' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '最初に着手する具体的な作業' })).toBeInTheDocument();
     expect(screen.getByText('求人要件と成果を対応付ける。')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /ミオ、キャリア担当。詳細を表示。新しい計画の担当者/ })).toBeInTheDocument();
+  });
+
+  it('saves the selected category, keeps the draft, and sends the category', async () => {
+    const user = userEvent.setup();
+    const learningResponse = { ...apiResponse, category: 'learning' as const, plan: { ...apiResponse.plan, summary: 'React学習の計画です。' } };
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify(learningResponse), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<App />);
+    const input = screen.getByLabelText('レンへの依頼内容');
+    await user.type(input, 'Reactを7日間で学ぶ計画を作ってください');
+    await user.click(screen.getByRole('radio', { name: 'AI学習' }));
+    expect(input).toHaveValue('Reactを7日間で学ぶ計画を作ってください');
+    expect(screen.getByText(/依頼文は残しています/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'レンに依頼する' }));
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ category: 'learning', task: 'Reactを7日間で学ぶ計画を作ってください' });
+    expect(JSON.parse(localStorage.getItem('ai-office-work-category-v1') ?? '{}')).toEqual({ version: 1, category: 'learning' });
+  });
+
+  it('clears only the current plan when the category changes', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify(apiResponse), { status: 200 })));
+    localStorage.setItem('unrelated-history', 'keep');
+    render(<App />);
+    const input = screen.getByLabelText('レンへの依頼内容');
+    await user.type(input, task);
+    await user.click(screen.getByRole('button', { name: 'レンに依頼する' }));
+    expect(await screen.findByText(apiResponse.plan.summary)).toBeInTheDocument();
+    await user.click(screen.getByRole('radio', { name: 'コンテンツ・SNS' }));
+    expect(screen.queryByText(apiResponse.plan.summary)).not.toBeInTheDocument();
+    expect(input).toHaveValue(task);
+    expect(localStorage.getItem('unrelated-history')).toBe('keep');
   });
 
   it('shows loading state and prevents duplicate submissions', async () => {
@@ -77,6 +110,7 @@ describe('TaskRequestSection', () => {
     expect(screen.getByRole('status')).toHaveTextContent('レンが依頼を確認し');
     expect(screen.getByRole('button', { name: /レン、マネージャー。詳細を表示。依頼を処理中/ })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledOnce();
+    expect(screen.getByRole('radio', { name: 'AI学習' })).toBeDisabled();
   });
 
   it('selects the existing employee panel from an assignment card', async () => {

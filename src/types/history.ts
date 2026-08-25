@@ -1,5 +1,6 @@
 import type { ManagerPlan } from './manager';
 import type { WorkResult } from './work';
+import type { WorkCategory } from '../../shared/workCategories';
 
 export type ReviewStatus = 'pending' | 'approved' | 'rejected';
 
@@ -8,6 +9,7 @@ export interface WorkHistoryEntry {
   createdAt: string;
   updatedAt: string;
   task: string;
+  category: WorkCategory;
   plan: ManagerPlan;
   results: WorkResult[];
   reviewStatus: ReviewStatus;
@@ -15,6 +17,6 @@ export interface WorkHistoryEntry {
 }
 
 export interface WorkHistoryStore {
-  version: 1;
+  version: 2;
   entries: WorkHistoryEntry[];
 }

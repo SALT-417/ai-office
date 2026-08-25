@@ -1,6 +1,7 @@
 import type { ServerConfig } from './config';
 import { EMPLOYEE_IDS, EMPLOYEE_ROLES, selectAssignees, type EmployeeName } from './manager';
 import { AI_OFFICE_PROJECT_CONTEXT_TEXT } from './project-context';
+import { CATEGORY_EMPLOYEE_ROLES, workCategoryById, type WorkCategory } from '../shared/workCategories';
 
 export type SpecialistName = Exclude<EmployeeName, 'レン'>;
 export type WorkStatus = 'completed' | 'failed';
@@ -17,22 +18,23 @@ export interface WorkResult {
 
 export interface WorkResponse {
   coordinator: 'レン';
+  category: WorkCategory;
   task: string;
   results: WorkResult[];
 }
 
-const prompts: Record<SpecialistName, string> = {
-  ミオ: '転職・キャリア・求人分析・応募資料について、比較表や確認項目など実用的な成果物を作る。',
-  ソウ: 'AI・Web開発について、一般的な技術一覧ではなく依頼に直結する成果物を作る。本文には「現在の構成」「次に実装する作業」「対象となる既存ファイルまたは機能」「完了条件」「テスト方法」の見出しを必ず入れる。対象を断定できなければ「確認が必要」と書く。',
-  ユナ: 'UI/UX・文章・ポートフォリオ表現について、改善案と具体的な文案を作る。',
-  アキ: 'テスト・品質・アクセシビリティについて、確認項目、期待結果、リスクを作る。',
-};
+function specialistPrompt(name: SpecialistName, category: WorkCategory): string {
+  if (name === 'ソウ' && category === 'development') return '既存のAI・Web構成に沿う具体的な成果物を作る。本文には「現在の構成」「次に実装する作業」「対象となる既存ファイルまたは機能」「完了条件」「テスト方法」の見出しを入れる。対象を断定できなければ「確認が必要」と書く。';
+  return `カテゴリ担当「${CATEGORY_EMPLOYEE_ROLES[category][name]}」の範囲で、依頼に直結する具体的な手順、成果物、確認条件を作る。`;
+}
 
 const commonPrompt = `あなたはAI OFFICEの専門社員です。次を必ず守ってください。
 - 指定された名前と固定役割を変えない。
 - 自分をQwen、Ollama、言語モデルと名乗らない。
-- AI OFFICEは求人掲載サービスではなく、React・TypeScript・Vite製の転職用ポートフォリオアプリ。
-- 下記の確定情報を現在の事実として扱い、依頼されていない技術を追加しない。
+- AI OFFICEというアプリ自体は転職用ポートフォリオ作品だが、入力された仕事は選択カテゴリに従う。
+- 転職カテゴリ以外の依頼を求人、応募、ポートフォリオ改善へ置き換えない。
+- 選択カテゴリ以外の前提や業界を追加しない。
+- 開発カテゴリで確定情報が示された場合は現在の事実として扱い、依頼されていない技術を追加しない。
 - 未採用技術を現在使用中のように書かない。
 - 変更提案をする場合は「現在の構成」と「提案」を明確に分ける。
 - 一般的な技術一覧ではなく、依頼に対する具体的な成果物を作る。
@@ -42,11 +44,12 @@ const commonPrompt = `あなたはAI OFFICEの専門社員です。次を必ず�
 - 日本語で簡潔に、次の行動に使える具体的なテキスト成果物を返す。
 - JSON以外を出力しない。形式は {"title":"成果物名","content":"本文"}。
 
-${AI_OFFICE_PROJECT_CONTEXT_TEXT}`;
+`;
 
-export function selectWorkAssignees(task: string): SpecialistName[] {
-  const selected = selectAssignees(task).filter((name): name is SpecialistName => name !== 'レン');
-  return (selected.length > 0 ? selected : (['ソウ'] satisfies SpecialistName[])).slice(0, 4);
+const specialistDefaults: Record<WorkCategory, SpecialistName> = { general: 'ソウ', learning: 'ソウ', development: 'ソウ', career: 'ミオ', content: 'ユナ' };
+export function selectWorkAssignees(task: string, category: WorkCategory = 'general'): SpecialistName[] {
+  const selected = selectAssignees(task, category).filter((name): name is SpecialistName => name !== 'レン');
+  return (selected.length > 0 ? selected : [specialistDefaults[category]]).slice(0, 4);
 }
 
 function failedResult(name: SpecialistName, error: string): WorkResult {
@@ -83,7 +86,10 @@ function containsUnsupportedCurrentClaim(content: string): boolean {
   return false;
 }
 
-function buildFallbackProduct(name: SpecialistName): { title: string; content: string } {
+function buildFallbackProduct(name: SpecialistName, category: WorkCategory): { title: string; content: string } {
+  if (category !== 'career' && !(category === 'development' && name === 'ソウ')) {
+    return { title: `${workCategoryById[category].label}の${name}担当成果物`, content: `## 依頼の前提\n選択カテゴリは「${workCategoryById[category].label}」です。依頼文にない用途や実行結果は追加しません。\n## 担当内容\n${CATEGORY_EMPLOYEE_ROLES[category][name]}\n## 最初の作業\n- 依頼文の目的、条件、期限を分ける\n- 担当範囲で使える成果物の形を決める\n- 人が確認できる完了条件を付ける\n## 確認\n未確認の事実は断定せず、利用前に人が内容を確認します。` };
+  }
   const products: Record<SpecialistName, { title: string; content: string }> = {
     ミオ: { title: '転職向け成果整理シート', content: '## 現在の前提\nAI OFFICEはReact 19、TypeScript、Vite 7とローカルOllamaを使う転職用ポートフォリオです。\n## 次の作業\n- 応募先で求められる経験を整理する\n- 既存機能のどれを根拠として説明するか対応付ける\n- 未確認の求人条件は確認が必要として分ける' },
     ソウ: { title: '既存構成に沿った技術実装計画', content: `## 現在の構成
@@ -120,7 +126,7 @@ function buildFallbackProduct(name: SpecialistName): { title: string; content: s
   return products[name];
 }
 
-function parseProduct(value: unknown, name: SpecialistName): { title: string; content: string } | null {
+function parseProduct(value: unknown, name: SpecialistName, category: WorkCategory): { title: string; content: string } | null {
   if (typeof value !== 'string') return null;
   try {
     const parsed = JSON.parse(value) as { title?: unknown; content?: unknown };
@@ -130,7 +136,7 @@ function parseProduct(value: unknown, name: SpecialistName): { title: string; co
     if (!title || !content || title.length > 120 || content.length > 8_000) return null;
     if (/確認済み|動作確認しました|テスト済み/.test(content)) return null;
     if (containsUnsupportedCurrentClaim(content)) return null;
-    if (name === 'ソウ') {
+    if (name === 'ソウ' && category === 'development') {
       if (!souRequiredSections.every((section) => content.includes(section))) return null;
       const currentSection = getSection(content, '現在の構成');
       if (!souCurrentContextTerms.every((term) => currentSection.includes(term))) return null;
@@ -141,7 +147,7 @@ function parseProduct(value: unknown, name: SpecialistName): { title: string; co
   }
 }
 
-async function runSpecialist(name: SpecialistName, task: string, config: ServerConfig, signal: AbortSignal, fetchImplementation: typeof fetch): Promise<WorkResult> {
+async function runSpecialist(name: SpecialistName, task: string, category: WorkCategory, config: ServerConfig, signal: AbortSignal, fetchImplementation: typeof fetch): Promise<WorkResult> {
   const employeeController = new AbortController();
   const employeeTimeout = setTimeout(() => employeeController.abort(), config.timeoutMs);
   const combinedSignal = AbortSignal.any([signal, employeeController.signal]);
@@ -155,15 +161,15 @@ async function runSpecialist(name: SpecialistName, task: string, config: ServerC
         format: 'json',
         options: { temperature: 0.25, top_p: 0.9, num_predict: 900 },
         messages: [
-          { role: 'system', content: `${commonPrompt}\n名前：${name}\n固定役割：${EMPLOYEE_ROLES[name]}\n専門指示：${prompts[name]}` },
-          { role: 'user', content: JSON.stringify({ task, output: 'テキスト成果物のみ。操作は実行しない。' }) },
+          { role: 'system', content: `${commonPrompt}\n${category === 'development' ? `${AI_OFFICE_PROJECT_CONTEXT_TEXT}\n` : ''}選択カテゴリ：${workCategoryById[category].label}\n名前：${name}\n固定役割：${EMPLOYEE_ROLES[name]}\nカテゴリ担当：${CATEGORY_EMPLOYEE_ROLES[category][name]}\n専門指示：${specialistPrompt(name, category)}` },
+          { role: 'user', content: JSON.stringify({ category, task, output: 'テキスト成果物のみ。操作は実行しない。' }) },
         ],
       }),
       signal: combinedSignal,
     });
     if (!response.ok) return failedResult(name, 'ローカルAIから成果物を受け取れませんでした。');
     const body = await response.json() as { message?: { content?: unknown } };
-    const product = parseProduct(body.message?.content, name) ?? buildFallbackProduct(name);
+    const product = parseProduct(body.message?.content, name, category) ?? buildFallbackProduct(name, category);
     return { employeeId: EMPLOYEE_IDS[name], name, role: EMPLOYEE_ROLES[name], status: 'completed', ...product };
   } catch (error) {
     const message = combinedSignal.aborted || (error instanceof Error && error.name === 'AbortError')
@@ -175,8 +181,8 @@ async function runSpecialist(name: SpecialistName, task: string, config: ServerC
   }
 }
 
-export async function requestWork(task: string, config: ServerConfig, fetchImplementation: typeof fetch = fetch, externalSignal?: AbortSignal): Promise<WorkResponse> {
-  const names = selectWorkAssignees(task);
+export async function requestWork(task: string, config: ServerConfig, fetchImplementation: typeof fetch = fetch, externalSignal?: AbortSignal, category: WorkCategory = 'general'): Promise<WorkResponse> {
+  const names = selectWorkAssignees(task, category);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.workTimeoutMs);
   const signal = externalSignal ? AbortSignal.any([controller.signal, externalSignal]) : controller.signal;
@@ -187,10 +193,10 @@ export async function requestWork(task: string, config: ServerConfig, fetchImple
       if (signal.aborted) {
         results.push(failedResult(name, '作業全体の制限時間を超えたため、この担当を開始できませんでした。'));
       } else {
-        results.push(await runSpecialist(name, task, config, signal, fetchImplementation));
+        results.push(await runSpecialist(name, task, category, config, signal, fetchImplementation));
       }
     }
-    return { coordinator: 'レン', task, results };
+    return { coordinator: 'レン', category, task, results };
   } finally {
     clearTimeout(timeout);
   }

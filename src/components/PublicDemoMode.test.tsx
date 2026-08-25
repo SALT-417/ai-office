@@ -18,14 +18,14 @@ describe('public sample mode', () => {
     localStorage.setItem('ai-office-work-history-v1', 'keep-work');
     localStorage.setItem('ai-office-analysis-history-v1', 'keep-analysis');
     await user.click(screen.getByRole('button', { name: 'サンプル計画を見る' }));
-    expect(screen.getByText(/AI OFFICEを転職用ポートフォリオとして/)).toBeInTheDocument();
+    expect(screen.getByText(/一般業務として整理する固定サンプル/)).toBeInTheDocument();
     expect(screen.getAllByText(new RegExp(PUBLIC_DEMO_NOTICE)).length).toBeGreaterThan(0);
     await user.click(screen.getByRole('button', { name: 'ソウの社員詳細を表示' }));
     expect(screen.getByRole('heading', { name: 'ソウ' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'サンプル成果物を見る' }));
-    expect(screen.getByText('現在の技術構成の説明例')).toBeInTheDocument();
+    expect(screen.getByText('一般業務の成果物例')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'サンプル成果物を閉じる' }));
-    expect(screen.queryByText('現在の技術構成の説明例')).not.toBeInTheDocument();
+    expect(screen.queryByText('一般業務の成果物例')).not.toBeInTheDocument();
 
     const analysis = screen.getByRole('region', { name: 'プロジェクトを分析' });
     await user.click(within(analysis).getByRole('button', { name: 'サンプル分析を見る' }));
@@ -45,5 +45,20 @@ describe('public sample mode', () => {
     expect(screen.getAllByText('ローカルAI稼働').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'レンに依頼する' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'サンプル計画を見る' })).not.toBeInTheDocument();
+  });
+
+  it('switches all five fixed category samples without API calls or history writes', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    render(<App runtimeMode="public-demo" />);
+    for (const label of ['一般業務', 'AI学習', 'ソフトウェア開発', '転職・キャリア', 'コンテンツ・SNS']) {
+      await user.click(screen.getByRole('radio', { name: label }));
+      await user.click(screen.getByRole('button', { name: 'サンプル計画を見る' }));
+      expect(screen.getByText(new RegExp(`${label}として整理する固定サンプル`))).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'サンプルを閉じる' }));
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(localStorage.getItem('ai-office-work-history-v1')).toBeNull();
   });
 });

@@ -7,6 +7,7 @@ function entry(index: number, overrides: Partial<WorkHistoryEntry> = {}): WorkHi
     id: `history-${index}`,
     createdAt: date,
     updatedAt: date,
+    category: 'general',
     task: `依頼 ${index}`,
     plan: { summary: '依頼の要約', assignments: [{ name: 'ソウ', task: 'AI・Web開発、技術実装' }], firstActions: ['作業を整理する'] },
     results: [{ employeeId: 'sou', name: 'ソウ', role: 'AI開発担当', status: 'completed', title: '成果物', content: '安全な本文' }],
@@ -20,7 +21,7 @@ describe('work history storage', () => {
   it('starts empty and restores a versioned store newest first', () => {
     expect(loadWorkHistory()).toEqual([]);
     saveWorkHistory([entry(1), entry(3), entry(2)]);
-    expect(JSON.parse(localStorage.getItem(WORK_HISTORY_STORAGE_KEY) ?? '{}').version).toBe(1);
+    expect(JSON.parse(localStorage.getItem(WORK_HISTORY_STORAGE_KEY) ?? '{}').version).toBe(2);
     expect(loadWorkHistory().map((item) => item.id)).toEqual(['history-3', 'history-2', 'history-1']);
   });
 
@@ -34,6 +35,13 @@ describe('work history storage', () => {
     expect(loadWorkHistory()).toEqual([]);
     localStorage.setItem(WORK_HISTORY_STORAGE_KEY, JSON.stringify({ version: 0, entries: [entry(1)] }));
     expect(loadWorkHistory()).toEqual([]);
+  });
+
+  it('migrates a valid v1 entry without category to general', () => {
+    const legacy = entry(7) as Partial<WorkHistoryEntry>;
+    delete legacy.category;
+    localStorage.setItem(WORK_HISTORY_STORAGE_KEY, JSON.stringify({ version: 1, entries: [legacy] }));
+    expect(loadWorkHistory()).toEqual([expect.objectContaining({ id: 'history-7', category: 'general' })]);
   });
 
   it('rejects invalid employee ids, review states, oversized text, and keeps valid entries', () => {

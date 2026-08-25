@@ -3,6 +3,7 @@
 import { getServerConfig } from './config';
 import { EMPLOYEE_ROLES } from './manager';
 import { AI_OFFICE_PROJECT_CONTEXT } from './project-context';
+import { CATEGORY_EMPLOYEE_ROLES } from '../shared/workCategories';
 import { requestWork, selectWorkAssignees } from './work';
 
 const config = getServerConfig({});
@@ -40,6 +41,16 @@ describe('work execution', () => {
     }
   });
 
+  it('keeps non-development category prompts free of project and career assumptions', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(validProduct('学習成果物'));
+    const result = await requestWork('7日間でReactを学ぶ計画を作る', config, fetchMock, undefined, 'learning');
+    expect(result.category).toBe('learning');
+    const prompt = JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).messages[0].content as string;
+    expect(prompt).toContain(`カテゴリ担当：${CATEGORY_EMPLOYEE_ROLES.learning.ソウ}`);
+    expect(prompt).not.toContain(AI_OFFICE_PROJECT_CONTEXT.apiEndpoints);
+    expect(prompt).not.toContain('求人・企業分析');
+  });
+
   it('keeps other employee results when one employee fails', async () => {
     const fetchMock = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(validProduct('ミオの成果'))
@@ -55,7 +66,7 @@ describe('work execution', () => {
 
   it('replaces an invalid Ollama response with a current-project fallback', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ message: { content: '<html>not json</html>' } }), { status: 200 }));
-    const result = await requestWork('APIを実装する', config, fetchMock);
+    const result = await requestWork('APIを実装する', config, fetchMock, undefined, 'development');
     expect(result.results).toEqual([expect.objectContaining({ name: 'ソウ', status: 'completed', title: '既存構成に沿った技術実装計画' })]);
     expect(result.results[0].content).toContain('React 19、TypeScript、Vite 7');
     expect(result.results[0].content).toContain('Node.js、Express、TypeScript');
@@ -69,7 +80,7 @@ describe('work execution', () => {
       content: '## 現在の構成\nReact、TypeScript、Vite、MongoDB、Jest、Enzyme\nViteのbuilt-in serverをデータ同期基盤として使用\n## 次に実装する作業\nAPIを作る\n## 対象となる既存ファイルまたは機能\n確認済みのDB設定\n## 完了条件\n実装完了\n## テスト方法\nJestで確認',
     });
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ message: { content: invented } }), { status: 200 }));
-    const [result] = (await requestWork('APIを実装する', config, fetchMock)).results;
+    const [result] = (await requestWork('APIを実装する', config, fetchMock, undefined, 'development')).results;
 
     expect(result.title).toBe('既存構成に沿った技術実装計画');
     expect(result.content).not.toContain('MongoDB');
@@ -87,7 +98,7 @@ describe('work execution', () => {
       content: '現在の構成:\nReact 19、TypeScript、Vite 7、Express、Ollama、Vitest\n次に実装する作業:\nPOST /api/managerとPOST /api/workを実装する\n対象となる既存ファイルまたは機能:\n確認が必要\n完了条件:\nAPIが動く\nテスト方法:\nVitestを使う',
     });
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ message: { content: outdated } }), { status: 200 }));
-    const [result] = (await requestWork('API実装の次の作業を整理する', config, fetchMock)).results;
+    const [result] = (await requestWork('API実装の次の作業を整理する', config, fetchMock, undefined, 'development')).results;
     expect(result.title).toBe('既存構成に沿った技術実装計画');
     expect(result.content).toContain('POST /api/manager、POST /api/work');
     expect(result.content).not.toContain('POST /api/managerとPOST /api/workを実装する');
@@ -95,7 +106,7 @@ describe('work execution', () => {
 
   it('passes the confirmed project context to every specialist prompt', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(validProduct('成果物'));
-    await requestWork('転職 AI UI テスト', config, fetchMock);
+    await requestWork('転職 AI UI テスト', config, fetchMock, undefined, 'development');
     for (const call of fetchMock.mock.calls) {
       const body = JSON.parse(String(call[1]?.body));
       const prompt = body.messages[0].content as string;
@@ -112,7 +123,7 @@ describe('work execution', () => {
   it('allows an unsupported technology only when it is clearly separated as a future proposal', async () => {
     const proposed = JSON.stringify({ title: '実装計画', content: '## 現在の構成\nReact 19、TypeScript、Vite 7、Express、Ollama、POST /api/manager、POST /api/work、Vitest\n## 次に実装する作業\n既存APIを改善する\n## 対象となる既存ファイルまたは機能\nPOST /api/work\n## 完了条件\n既存構成を維持する\n## テスト方法\nVitestを実行する\n## 提案\n将来の候補としてMongoDBを検討する' });
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ message: { content: proposed } }), { status: 200 }));
-    const [result] = (await requestWork('APIを実装する', config, fetchMock)).results;
+    const [result] = (await requestWork('APIを実装する', config, fetchMock, undefined, 'development')).results;
     expect(result.title).toBe('実装計画');
     expect(result.content).toContain('将来の候補としてMongoDBを検討する');
   });

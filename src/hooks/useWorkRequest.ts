@@ -3,6 +3,7 @@ import type { EmployeeId } from '../types/office';
 import type { SpecialistEmployeeId, WorkRequestStatus, WorkResponse, WorkResult } from '../types/work';
 import { createHistoryId } from '../utils/workHistoryStorage';
 import { appRuntimeMode, type AppRuntimeMode } from '../utils/runtimeMode';
+import { isWorkCategory, type WorkCategory } from '../../shared/workCategories';
 
 const CLIENT_TIMEOUT_MS = 100_000;
 const specialistIds: SpecialistEmployeeId[] = ['mio', 'sou', 'yuna', 'aki'];
@@ -24,6 +25,7 @@ function isWorkResponse(value: unknown): value is WorkResponse {
   if (typeof value !== 'object' || value === null) return false;
   const response = value as Partial<WorkResponse>;
   return response.coordinator === 'レン' && typeof response.task === 'string'
+    && isWorkCategory(response.category)
     && Array.isArray(response.results) && response.results.length >= 1 && response.results.length <= 4
     && response.results.every(isWorkResult);
 }
@@ -72,7 +74,7 @@ export function useWorkRequest(runtimeMode: AppRuntimeMode = appRuntimeMode) {
     }
   };
 
-  const execute = async (task: string, expectedEmployeeIds: EmployeeId[]) => {
+  const execute = async (task: string, expectedEmployeeIds: EmployeeId[], category: WorkCategory = 'general') => {
     if (runtimeMode === 'public-demo') return;
     controllerRef.current?.abort();
     const controller = new AbortController();
@@ -88,7 +90,7 @@ export function useWorkRequest(runtimeMode: AppRuntimeMode = appRuntimeMode) {
       const apiResponse = await fetch('/api/work', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task }),
+        body: JSON.stringify({ category, task }),
         signal: controller.signal,
       });
       const body: unknown = await apiResponse.json().catch(() => null);

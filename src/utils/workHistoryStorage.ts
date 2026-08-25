@@ -1,9 +1,10 @@
 import type { ManagerEmployeeName, ManagerPlan } from '../types/manager';
 import type { ReviewStatus, WorkHistoryEntry, WorkHistoryStore } from '../types/history';
 import type { SpecialistEmployeeId, WorkResult } from '../types/work';
+import { isWorkCategory, normalizeWorkCategory } from '../../shared/workCategories';
 
 export const WORK_HISTORY_STORAGE_KEY = 'ai-office-work-history-v1';
-export const WORK_HISTORY_VERSION = 1;
+export const WORK_HISTORY_VERSION = 2;
 export const MAX_HISTORY_ENTRIES = 20;
 export const MAX_REVIEW_NOTE_LENGTH = 1_000;
 
@@ -44,6 +45,7 @@ export function isWorkHistoryEntry(value: unknown): value is WorkHistoryEntry {
   const entry = value as Partial<WorkHistoryEntry>;
   return validText(entry.id, 120) && validIsoDate(entry.createdAt) && validIsoDate(entry.updatedAt)
     && validText(entry.task, 2_000) && validPlan(entry.plan)
+    && isWorkCategory(entry.category)
     && Array.isArray(entry.results) && entry.results.length >= 1 && entry.results.length <= 4 && entry.results.every(validResult)
     && reviewStatuses.includes(entry.reviewStatus as ReviewStatus)
     && validText(entry.reviewNote, MAX_REVIEW_NOTE_LENGTH, true);
@@ -53,9 +55,9 @@ export function loadWorkHistory(storage: Storage = localStorage): WorkHistoryEnt
   try {
     const raw = storage.getItem(WORK_HISTORY_STORAGE_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as Partial<WorkHistoryStore>;
-    if (parsed.version !== WORK_HISTORY_VERSION || !Array.isArray(parsed.entries)) return [];
-    return parsed.entries.filter(isWorkHistoryEntry).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, MAX_HISTORY_ENTRIES);
+    const parsed = JSON.parse(raw) as { version?: number; entries?: unknown[] };
+    if ((parsed.version !== 1 && parsed.version !== WORK_HISTORY_VERSION) || !Array.isArray(parsed.entries)) return [];
+    return parsed.entries.map((entry) => typeof entry === 'object' && entry !== null ? { ...entry, category: normalizeWorkCategory((entry as { category?: unknown }).category) } : entry).filter(isWorkHistoryEntry).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, MAX_HISTORY_ENTRIES);
   } catch {
     return [];
   }

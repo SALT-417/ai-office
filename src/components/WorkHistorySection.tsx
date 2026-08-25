@@ -5,6 +5,7 @@ import type { EmployeeId } from '../types/office';
 import { MAX_REVIEW_NOTE_LENGTH } from '../utils/workHistoryStorage';
 import { SafeWorkContent } from './WorkResults';
 import type { AppRuntimeMode } from '../utils/runtimeMode';
+import { workCategoryById, type WorkCategory } from '../../shared/workCategories';
 
 interface Props {
   entries: WorkHistoryEntry[];
@@ -14,7 +15,7 @@ interface Props {
   onReview: (id: string, status: ReviewStatus, note: string) => void;
   onDeleteOne: (id: string) => void;
   onDeleteAll: () => void;
-  onRestoreTask: (task: string) => void;
+  onRestoreTask: (task: string, category: WorkCategory) => void;
   onSelectEmployee: (id: EmployeeId) => void;
   runtimeMode?: AppRuntimeMode;
 }
@@ -59,13 +60,13 @@ export function WorkHistorySection({ entries, selectedEntry, storageError, onSel
 
     {entries.length === 0 ? <div className="history-empty"><span aria-hidden="true">▤</span><h3>作業履歴はまだありません</h3><p>専門社員の成果物が完成すると、依頼・計画・成果物がここへ保存されます。</p></div> : <div className="history-layout">
       <div className="history-list" aria-label="保存された作業履歴">{entries.map((entry) => <button type="button" className={`history-list-item${selectedEntry?.id === entry.id ? ' active' : ''}`} key={entry.id} onClick={() => onSelect(entry.id)} aria-pressed={selectedEntry?.id === entry.id}>
-        <span className={`review-badge ${entry.reviewStatus}`}>{reviewLabels[entry.reviewStatus]}</span><strong>{entry.task}</strong><small>{formatJapanDate(entry.createdAt)} · {entry.results.map((result) => employeeById[result.employeeId].name).join('・')}</small>
+        <span className={`review-badge ${entry.reviewStatus}`}>{reviewLabels[entry.reviewStatus]}</span><strong>{entry.task}</strong><small>{workCategoryById[entry.category].label} · {formatJapanDate(entry.createdAt)} · {entry.results.map((result) => employeeById[result.employeeId].name).join('・')}</small>
       </button>)}</div>
 
       {selectedEntry && <article className="history-detail" aria-labelledby="history-detail-title">
         <div className="history-detail-heading"><div><p className="eyebrow">SAVED RESULT</p><h3 id="history-detail-title">履歴の詳細</h3></div><button type="button" className="history-delete-one" onClick={() => setDeleteTarget(selectedEntry.id)}>この履歴を削除</button></div>
-        <dl className="history-meta"><div><dt>依頼</dt><dd>{selectedEntry.task}</dd></div><div><dt>作成日時</dt><dd>{formatJapanDate(selectedEntry.createdAt)}</dd></div><div><dt>更新日時</dt><dd>{formatJapanDate(selectedEntry.updatedAt)}</dd></div></dl>
-        <button type="button" className="restore-task" onClick={() => onRestoreTask(selectedEntry.task)}>同じ依頼を入力欄へ戻す</button><p className="restore-note">入力欄へ戻すだけで、自動送信はしません。</p>
+        <dl className="history-meta"><div><dt>カテゴリ</dt><dd>{workCategoryById[selectedEntry.category].label}</dd></div><div><dt>依頼</dt><dd>{selectedEntry.task}</dd></div><div><dt>作成日時</dt><dd>{formatJapanDate(selectedEntry.createdAt)}</dd></div><div><dt>更新日時</dt><dd>{formatJapanDate(selectedEntry.updatedAt)}</dd></div></dl>
+        <button type="button" className="restore-task" onClick={() => onRestoreTask(selectedEntry.task, selectedEntry.category)}>同じ依頼を入力欄へ戻す</button><p className="restore-note">カテゴリと依頼文を戻すだけで、自動送信はしません。</p>
 
         <section className="history-plan" aria-labelledby="saved-plan-title"><h4 id="saved-plan-title">保存された計画</h4><p>{selectedEntry.plan.summary}</p><ol>{selectedEntry.plan.firstActions.map((action) => <li key={action}>{action}</li>)}</ol></section>
         <section className="history-products" aria-labelledby="saved-products-title"><h4 id="saved-products-title">保存された成果物</h4>{selectedEntry.results.map((result) => {

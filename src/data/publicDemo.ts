@@ -2,6 +2,7 @@ import type { AnalysisResponse } from '../types/analysis';
 import type { ManagerApiResponse } from '../types/manager';
 import type { SpecialistEmployeeId, WorkResponse, WorkResult } from '../types/work';
 import { employeeById } from './employees';
+import { CATEGORY_EMPLOYEE_ROLES, workCategoryById, type WorkCategory } from '../../shared/workCategories';
 
 export const PUBLIC_DEMO_NOTICE = 'この結果は公開デモ用に用意した固定例で、現在AIが生成したものではありません。';
 
@@ -9,6 +10,7 @@ export const publicDemoTask = 'AIエンジニア転職用ポートフォリオ�
 
 export const publicDemoPlan: ManagerApiResponse = {
   manager: 'レン',
+  category: 'career',
   reply: PUBLIC_DEMO_NOTICE,
   plan: {
     summary: 'AI OFFICEを転職用ポートフォリオとして伝わりやすくし、ローカルAIの実働設計・安全性・品質を役割別に整理する固定サンプル計画です。',
@@ -34,6 +36,7 @@ function sampleWorkResult(employeeId: SpecialistEmployeeId, title: string, conte
 
 export const publicDemoWork: WorkResponse = {
   coordinator: 'レン',
+  category: 'career',
   task: publicDemoTask,
   results: [
     sampleWorkResult('mio', '採用担当者へ伝える経験の整理例', '## 伝えるポイント\n・ローカルLLMを役割分担型ワークフローへ組み込んだ設計\n・AIの提案を人が承認するまで自動実行しない安全設計\n・公開版とローカル実働版を明確に分ける判断'),
@@ -42,6 +45,31 @@ export const publicDemoWork: WorkResponse = {
     sampleWorkResult('aki', '品質確認の観点例', '## 確認対象\nVitest・React Testing LibraryでAPIエラー、タイムアウト、キャンセル、StrictMode、キーボード操作を確認します。localStorageの履歴と承認状態も境界値を検証します。\n## 安全性\n読み取り専用分析ではパス、秘密情報、プロンプトインジェクションをサーバーで検証します。'),
   ],
 };
+
+const sampleTasks: Record<WorkCategory, string> = {
+  general: '複数のタスクを整理し、今日の優先順位を決めてください',
+  learning: '7日間でReactの基礎を学ぶ計画を作ってください',
+  development: 'AI OFFICEのAPI入力検証とエラー処理を安全に改善してください',
+  career: 'AIエンジニア応募に向けた準備を整理してください',
+  content: 'AIイラスト投稿の1週間企画を作ってください',
+};
+
+function createSamplePlan(category: WorkCategory): ManagerApiResponse {
+  const task = sampleTasks[category];
+  return { manager: 'レン', category, reply: PUBLIC_DEMO_NOTICE, plan: {
+    summary: `「${task}」を${workCategoryById[category].label}として整理する固定サンプルです。`,
+    assignments: (['レン', 'ミオ', 'ソウ', 'ユナ', 'アキ'] as const).map((name) => ({ name, task: CATEGORY_EMPLOYEE_ROLES[category][name] })),
+    firstActions: [`依頼の目的と期限を確認する`, `${CATEGORY_EMPLOYEE_ROLES[category].レン}を基準に優先順位を決める`, `各担当の成果物と人が確認する完了条件を決める`],
+  } };
+}
+
+function createSampleWork(category: WorkCategory): WorkResponse {
+  const specialist = ({ general: 'yuna', learning: 'sou', development: 'sou', career: 'mio', content: 'yuna' } as const)[category];
+  const name = employeeById[specialist].name as keyof (typeof CATEGORY_EMPLOYEE_ROLES)['general'];
+  return { coordinator: 'レン', category, task: sampleTasks[category], results: [sampleWorkResult(specialist, `${workCategoryById[category].label}の成果物例`, `## 固定サンプル\n${CATEGORY_EMPLOYEE_ROLES[category][name]}を担当範囲として、依頼の目的、最初の行動、確認条件を整理します。\n## 次の行動\n・依頼文の条件を確認する\n・小さく始められる作業を1つ選ぶ\n・人が確認できる完了条件を付ける`)] };
+}
+
+export const publicDemoSamples = Object.fromEntries((Object.keys(sampleTasks) as WorkCategory[]).map((category) => [category, { task: sampleTasks[category], plan: createSamplePlan(category), work: createSampleWork(category) }])) as Record<WorkCategory, { task: string; plan: ManagerApiResponse; work: WorkResponse }>;
 
 export const publicDemoAnalysis: AnalysisResponse = {
   specialist: 'aki', specialistName: 'アキ', objective: '分析APIの入力検証、キャンセル、エラー処理の安全設計を説明する固定サンプル',

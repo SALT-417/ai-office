@@ -1,7 +1,8 @@
 // @vitest-environment node
 
 import { getServerConfig } from './config';
-import { EMPLOYEE_ROLES, MANAGER_SYSTEM_PROMPT, ManagerError, requestManagerReply, selectAssignees } from './manager';
+import { MANAGER_SYSTEM_PROMPT, ManagerError, requestManagerReply, selectAssignees } from './manager';
+import { CATEGORY_EMPLOYEE_ROLES } from '../shared/workCategories';
 
 const config = getServerConfig({});
 
@@ -14,7 +15,7 @@ describe('requestManagerReply', () => {
     expect(result.reply).toContain('依頼の理解');
     expect(result.reply).toContain('担当者と担当内容');
     expect(result.reply).toContain('最初に着手する具体的な作業');
-    expect(result.plan.assignments).toEqual([{ name: 'ソウ', task: EMPLOYEE_ROLES.ソウ }]);
+    expect(result.plan.assignments).toEqual([{ name: 'ソウ', task: CATEGORY_EMPLOYEE_ROLES.general.ソウ }]);
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, options] = fetchMock.mock.calls[0];
     expect(url).toBe('http://127.0.0.1:11434/api/chat');
@@ -25,13 +26,14 @@ describe('requestManagerReply', () => {
       format: 'json',
       options: { temperature: 0.2, top_p: 0.9, num_predict: 400 },
     });
-    expect(body.messages[0]).toEqual({ role: 'system', content: MANAGER_SYSTEM_PROMPT });
+    expect(body.messages[0].content).toContain(MANAGER_SYSTEM_PROMPT);
+    expect(body.messages[0].content).toContain('選択カテゴリ：一般業務');
     const userMessage = JSON.parse(body.messages[1].content);
     expect(userMessage.task).toBe('APIを実装してください');
-    expect(userMessage.fixedContext).toContain('求人掲載サービスではありません');
-    expect(userMessage.allowedAssignments).toEqual([{ name: 'ソウ', task: EMPLOYEE_ROLES.ソウ }]);
-    expect(MANAGER_SYSTEM_PROMPT).toContain('転職用ポートフォリオアプリ');
-    expect(MANAGER_SYSTEM_PROMPT).toContain('求人情報を集めて掲載するサービスではない');
+    expect(userMessage.category).toBe('general');
+    expect(userMessage.allowedAssignments).toEqual([{ name: 'ソウ', task: CATEGORY_EMPLOYEE_ROLES.general.ソウ }]);
+    expect(MANAGER_SYSTEM_PROMPT).toContain('AIエンジニア転職用のポートフォリオ作品');
+    expect(MANAGER_SYSTEM_PROMPT).toContain('転職以外の依頼を求人、応募、ポートフォリオ改善へ置き換えない');
     expect(MANAGER_SYSTEM_PROMPT).toContain('担当者の追加や役割変更をしない');
     expect(MANAGER_SYSTEM_PROMPT).toContain('JSON以外を出力しない');
   });
@@ -56,15 +58,15 @@ describe('requestManagerReply', () => {
     expect(result.reply).toContain('最初に着手する具体的な作業');
     expect(result.reply).not.toContain('広告担当');
     expect(result.reply).not.toContain('求人情報サービスとして');
-    expect(result.plan.assignments).toEqual(Object.entries(EMPLOYEE_ROLES).map(([name, role]) => ({ name, task: role })));
+    expect(result.plan.assignments).toEqual(Object.entries(CATEGORY_EMPLOYEE_ROLES.general).map(([name, role]) => ({ name, task: role })));
     expect(result.plan.firstActions.length).toBeGreaterThanOrEqual(2);
-    expect(result.plan.firstActions.some((action) => action.includes('アクセシビリティ'))).toBe(true);
+    expect(result.plan.firstActions.some((action) => action.includes(CATEGORY_EMPLOYEE_ROLES.general.アキ))).toBe(true);
   });
 
   it('uses the safe fallback when Ollama returns invalid JSON', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ message: { content: 'JSONではない返答です' } }), { status: 200 }));
     const result = await requestManagerReply('品質を確認してください', config, fetchMock);
-    expect(result.plan.assignments).toEqual([{ name: 'アキ', task: EMPLOYEE_ROLES.アキ }]);
+    expect(result.plan.assignments).toEqual([{ name: 'アキ', task: CATEGORY_EMPLOYEE_ROLES.general.アキ }]);
     expect(result.plan.firstActions).toHaveLength(2);
     expect(result.reply).toContain('最初に着手する具体的な作業');
   });
@@ -72,6 +74,15 @@ describe('requestManagerReply', () => {
   it('rejects an invalid Ollama response', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ message: {} }), { status: 200 }));
     await expect(requestManagerReply('確認', config, fetchMock)).rejects.toMatchObject({ code: 'OLLAMA_INVALID_RESPONSE' } satisfies Partial<ManagerError>);
+  });
+
+  it('uses category-specific selection and fixed assignments', async () => {
+    expect(selectAssignees('7日間でReactの基礎を学ぶ計画を作ってください', 'learning')).toEqual(['レン', 'ソウ']);
+    expect(selectAssignees('AIイラスト投稿の1週間企画を作ってください', 'content')).toEqual(['レン', 'ソウ', 'ユナ']);
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ message: { content: 'invalid' } }), { status: 200 }));
+    const result = await requestManagerReply('APIの入力検証を改善する', config, fetchMock, 'development');
+    expect(result.category).toBe('development');
+    expect(result.plan.assignments.find(({ name }) => name === 'ソウ')?.task).toBe(CATEGORY_EMPLOYEE_ROLES.development.ソウ);
   });
 
   it('returns a useful error when the configured model is missing', async () => {
