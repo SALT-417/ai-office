@@ -4,6 +4,7 @@ export interface ServerConfig {
   ollamaUrl: string;
   ollamaModel: string;
   timeoutMs: number;
+  workTimeoutMs: number;
 }
 
 function readInteger(value: string | undefined, fallback: number, minimum: number, maximum: number): number {
@@ -18,5 +19,6 @@ export function getServerConfig(environment: NodeJS.ProcessEnv = process.env): S
     ollamaUrl: environment.OLLAMA_CHAT_URL?.trim() || 'http://127.0.0.1:11434/api/chat',
     ollamaModel: environment.OLLAMA_MODEL?.trim() || 'qwen2.5:3b',
     timeoutMs: readInteger(environment.OLLAMA_TIMEOUT_MS, 30_000, 1_000, 120_000),
+    workTimeoutMs: readInteger(environment.WORK_TIMEOUT_MS, 90_000, 5_000, 300_000),
   };
 }

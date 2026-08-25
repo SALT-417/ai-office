@@ -57,10 +57,13 @@ npm run dev
 ```
 
 - Web画面：`http://localhost:5173/ai-office/`
-- ローカルAPI：`http://127.0.0.1:8787/api/manager`
+- 計画API：`http://127.0.0.1:8787/api/manager`
+- テキスト成果物API：`http://127.0.0.1:8787/api/work`
 - Ollama API：`http://127.0.0.1:11434/api/chat`
 
-画面下部の「AIへ仕事を依頼」に内容を入力し、「レンに依頼する」を選択します。結果の担当者カードを選ぶと、既存の社員詳細パネルもその社員へ切り替わります。
+画面下部の「AIへ仕事を依頼」に内容を入力し、「レンに依頼する」を選択します。計画が表示されたら「担当社員に実行してもらう」を選ぶと、該当する専門社員が順番にテキスト成果物を作ります。担当者カードを選ぶと、既存の社員詳細パネルもその社員へ切り替わります。
+
+AIの出力は提案として表示され、利用前に人が確認する前提です。この段階ではファイル変更、コマンド実行、Git操作、外部送信は行いません。
 
 Express APIだけを起動する場合は次を使用します。
 
@@ -87,17 +90,20 @@ npm run start:api
 }
 ```
 
+`POST /api/work`も同じ`task`だけを受け取ります。担当者と役割はクライアント値を信用せずサーバー側で決定し、レンを除く最大4名の専門社員が成果物を返します。1名が失敗しても、ほかの社員の結果は維持されます。
+
 モデルなどを変更する場合は、`.env.example`に記載された環境変数をPowerShellで設定してから起動します。APIキーや秘密情報は不要です。
 
 ```powershell
 $env:OLLAMA_MODEL = "qwen2.5:3b"
 $env:OLLAMA_TIMEOUT_MS = "30000"
+$env:WORK_TIMEOUT_MS = "90000"
 npm run dev
 ```
 
 ### GitHub Pages版について
 
-[GitHub Pages版](https://salt-417.github.io/ai-office/)は静的なデモ表示のみです。GitHub PagesはExpressやOllamaを実行しないため、依頼欄にはその旨を表示し、送信ボタンを無効にしています。5モード、社員選択、進捗変更など既存のデモ機能は引き続き操作できます。ローカルAI機能は、利用者のPC上でOllamaと`npm run dev`を起動した場合だけ動作します。
+[GitHub Pages版](https://salt-417.github.io/ai-office/)は静的なデモ表示のみです。GitHub PagesはExpressやOllamaを実行しないため、依頼と成果物生成のボタンを無効にしています。5モード、社員選択、進捗変更など既存のデモ機能は引き続き操作できます。ローカルAI機能は、利用者のPC上でOllamaと`npm run dev`を起動した場合だけ動作します。
 
 ## 品質確認コマンド
 
@@ -166,4 +172,4 @@ npm run build
 - 外部AI API、クラウドバックエンド
 - 課金、複数ユーザー共有
 - GitHub Pages上でのローカルAI API実行
-- 他の4名への自動振り分けとAI依頼用画面UI
+- AIによるファイル変更、コマンド実行、Git操作、外部送信

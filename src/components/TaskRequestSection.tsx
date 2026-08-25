@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react';
 import { employeeById, employees } from '../data/employees';
 import type { EmployeeId } from '../types/office';
 import type { ManagerApiResponse, ManagerEmployeeName, ManagerRequestStatus } from '../types/manager';
+import type { WorkRequestStatus, WorkResponse } from '../types/work';
+import { WorkResults } from './WorkResults';
 
 const MAX_TASK_LENGTH = 2_000;
 const employeeIdByName = Object.fromEntries(employees.map((employee) => [employee.name, employee.id])) as Record<ManagerEmployeeName, EmployeeId>;
@@ -12,18 +14,27 @@ interface Props {
   error: string | null;
   onSubmit: (task: string) => Promise<void>;
   onSelectEmployee: (id: EmployeeId) => void;
+  workStatus?: WorkRequestStatus;
+  workResponse?: WorkResponse | null;
+  workError?: string | null;
+  onExecute?: (task: string, employeeIds: EmployeeId[]) => void;
+  onCancelWork?: () => void;
   isStaticDemo?: boolean;
 }
 
-export function TaskRequestSection({ status, response, error, onSubmit, onSelectEmployee, isStaticDemo = import.meta.env.PROD }: Props) {
+export function TaskRequestSection({ status, response, error, onSubmit, onSelectEmployee, workStatus = 'idle', workResponse = null, workError = null, onExecute = () => undefined, onCancelWork = () => undefined, isStaticDemo = import.meta.env.PROD }: Props) {
   const [task, setTask] = useState('');
+  const [plannedTask, setPlannedTask] = useState('');
   const normalizedTask = task.trim();
   const isLoading = status === 'loading';
   const isDisabled = normalizedTask.length === 0 || isLoading || isStaticDemo;
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    if (!isDisabled) void onSubmit(normalizedTask);
+    if (!isDisabled) {
+      setPlannedTask(normalizedTask);
+      void onSubmit(normalizedTask);
+    }
   };
 
   return <section className="work-request" aria-labelledby="work-request-title">
@@ -54,6 +65,7 @@ export function TaskRequestSection({ status, response, error, onSubmit, onSelect
           return <button type="button" className="assignment-card" key={assignment.name} onClick={() => onSelectEmployee(id)} aria-label={`${employee.name}の社員詳細を表示`}><img src={employee.image} alt="" /><span><strong>{employee.name}<small>{employee.role}</small></strong><p>{assignment.task}</p></span><b aria-hidden="true">→</b></button>;
         })}</div></div>
         <div className="plan-block"><h4>最初に着手する具体的な作業</h4><ol>{response.plan.firstActions.map((action) => <li key={action}>{action}</li>)}</ol></div>
+        <WorkResults status={workStatus} response={workResponse} error={workError} onExecute={() => onExecute(plannedTask, response.plan.assignments.filter((assignment) => assignment.name !== 'レン').map((assignment) => employeeIdByName[assignment.name]))} onCancel={onCancelWork} onSelectEmployee={onSelectEmployee} isStaticDemo={isStaticDemo} />
       </div>}
     </div>
   </section>;

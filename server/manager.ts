@@ -27,6 +27,14 @@ export const EMPLOYEE_ROLES = {
   アキ: 'テスト、品質、アクセシビリティ',
 } as const;
 
+export const EMPLOYEE_IDS = {
+  レン: 'ren',
+  ミオ: 'mio',
+  ソウ: 'sou',
+  ユナ: 'yuna',
+  アキ: 'aki',
+} as const;
+
 export type EmployeeName = keyof typeof EMPLOYEE_ROLES;
 
 export interface ManagerPlan {

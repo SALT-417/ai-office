@@ -1,15 +1,18 @@
 import express, { type ErrorRequestHandler } from 'express';
 import { getServerConfig, type ServerConfig } from './config';
 import { ManagerError, MAX_TASK_LENGTH, requestManagerReply, type ManagerReply } from './manager';
+import { requestWork, type WorkResponse } from './work';
 
 export interface AppDependencies {
   config?: ServerConfig;
   managerReply?: (task: string) => Promise<ManagerReply>;
+  workReply?: (task: string, signal?: AbortSignal) => Promise<WorkResponse>;
 }
 
 export function createApp(dependencies: AppDependencies = {}) {
   const config = dependencies.config ?? getServerConfig();
   const managerReply = dependencies.managerReply ?? ((task: string) => requestManagerReply(task, config));
+  const workReply = dependencies.workReply ?? ((task: string, signal?: AbortSignal) => requestWork(task, config, fetch, signal));
   const app = express();
 
   app.disable('x-powered-by');
@@ -43,6 +46,34 @@ export function createApp(dependencies: AppDependencies = {}) {
       }
       console.error('[AI OFFICE API] Manager request failed:', error instanceof Error ? error.message : 'Unknown error');
       response.status(500).json({ error: '処理中に問題が発生しました。時間をおいて再度お試しください。' });
+    }
+  });
+
+  app.post('/api/work', async (request, response) => {
+    const task = request.body?.task;
+    if (typeof task !== 'string') {
+      response.status(400).json({ error: 'taskには文字列を指定してください。' });
+      return;
+    }
+    const normalizedTask = task.trim();
+    if (normalizedTask.length === 0) {
+      response.status(400).json({ error: '依頼内容を入力してください。' });
+      return;
+    }
+    if (normalizedTask.length > MAX_TASK_LENGTH) {
+      response.status(400).json({ error: `依頼内容は${MAX_TASK_LENGTH}文字以内で入力してください。` });
+      return;
+    }
+    try {
+      const controller = new AbortController();
+      request.once('aborted', () => controller.abort());
+      response.once('close', () => {
+        if (!response.writableEnded) controller.abort();
+      });
+      response.json(await workReply(normalizedTask, controller.signal));
+    } catch (error) {
+      console.error('[AI OFFICE API] Work request failed:', error instanceof Error ? error.message : 'Unknown error');
+      response.status(500).json({ error: '成果物の作成中に問題が発生しました。時間をおいて再度お試しください。' });
     }
   });
 
