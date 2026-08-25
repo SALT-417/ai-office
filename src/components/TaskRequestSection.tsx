@@ -7,6 +7,7 @@ import { WorkResults } from './WorkResults';
 import { PUBLIC_DEMO_NOTICE, publicDemoSamples } from '../data/publicDemo';
 import type { AppRuntimeMode } from '../utils/runtimeMode';
 import { WORK_CATEGORIES, workCategoryById, type WorkCategory } from '../../shared/workCategories';
+import { RequestTemplateList } from './RequestTemplateList';
 
 const MAX_TASK_LENGTH = 2_000;
 const employeeIdByName = Object.fromEntries(employees.map((employee) => [employee.name, employee.id])) as Record<ManagerEmployeeName, EmployeeId>;
@@ -37,6 +38,7 @@ export function TaskRequestSection({ status, response, error, onSubmit, onSelect
   const [samplePlanVisible, setSamplePlanVisible] = useState(false);
   const [sampleWorkVisible, setSampleWorkVisible] = useState(false);
   const [categoryChanged, setCategoryChanged] = useState(false);
+  const [templateNotice, setTemplateNotice] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const normalizedTask = task.trim();
   const isLoading = status === 'loading';
@@ -49,6 +51,7 @@ export function TaskRequestSection({ status, response, error, onSubmit, onSelect
     if (!taskToRestore) return;
     setTask(taskToRestore.value);
     setCategoryChanged(false);
+    setTemplateNotice('');
     textareaRef.current?.focus();
   }, [taskToRestore]);
 
@@ -61,6 +64,13 @@ export function TaskRequestSection({ status, response, error, onSubmit, onSelect
     }
   };
 
+  const applyTemplate = (prompt: string) => {
+    setTask(prompt);
+    setCategoryChanged(false);
+    setTemplateNotice('テンプレートを依頼欄へ反映しました。送信前に内容を編集できます。');
+    textareaRef.current?.focus();
+  };
+
   return <section className="work-request" aria-labelledby="work-request-title">
     <div className="request-heading">
       <div><p className="eyebrow">LOCAL AI WORKFLOW</p><h2 id="work-request-title">AIへ仕事を依頼</h2><p>マネージャーのレンが依頼を整理し、5人の担当計画を作ります。</p></div>
@@ -69,13 +79,16 @@ export function TaskRequestSection({ status, response, error, onSubmit, onSelect
 
     {isStaticDemo && <><p className="demo-notice" role="note"><strong>公開版は固定サンプルです。</strong> APIやOllamaへ通信しません。ローカル版ではPC上のOllamaとExpressを使って実際の計画を生成できます。</p><div className="sample-controls"><button type="button" className="request-submit" onClick={() => { setSamplePlanVisible(true); setSampleWorkVisible(false); }}>{samplePlanVisible ? 'サンプル計画を最初から見る' : 'サンプル計画を見る'}</button>{samplePlanVisible && <button type="button" className="cancel-button" onClick={() => { setSamplePlanVisible(false); setSampleWorkVisible(false); }}>サンプルを閉じる</button>}</div></>}
 
-    <fieldset className="work-category-selector" disabled={categoryLocked}><legend>業務カテゴリ</legend><div role="radiogroup" aria-label="業務カテゴリ">{WORK_CATEGORIES.map((item) => <label className={category === item.id ? 'active' : ''} key={item.id}><input type="radio" name="work-category" value={item.id} checked={category === item.id} onChange={() => { setPlannedTask(''); setSamplePlanVisible(false); setSampleWorkVisible(false); setCategoryChanged(true); onCategoryChange(item.id); }} /><span>{item.label}</span></label>)}</div><p><strong>{workCategoryById[category].label}：</strong>{workCategoryById[category].description}</p><small>依頼例：{workCategoryById[category].example}</small>{categoryChanged && normalizedTask && <em aria-live="polite">依頼文は残しています。カテゴリ変更後は内容を確認してから送信してください。</em>}</fieldset>
+    <fieldset className="work-category-selector" disabled={categoryLocked}><legend>業務カテゴリ</legend><div role="radiogroup" aria-label="業務カテゴリ">{WORK_CATEGORIES.map((item) => <label className={category === item.id ? 'active' : ''} key={item.id}><input type="radio" name="work-category" value={item.id} checked={category === item.id} onChange={() => { setPlannedTask(''); setSamplePlanVisible(false); setSampleWorkVisible(false); setTemplateNotice(''); setCategoryChanged(true); onCategoryChange(item.id); }} /><span>{item.label}</span></label>)}</div><p><strong>{workCategoryById[category].label}：</strong>{workCategoryById[category].description}</p><small>依頼例：{workCategoryById[category].example}</small>{categoryChanged && normalizedTask && <em aria-live="polite">依頼文は残しています。カテゴリ変更後は内容を確認してから送信してください。</em>}</fieldset>
     {categoryStorageError && <p className="request-error" role="alert">{categoryStorageError}</p>}
+
+    <RequestTemplateList category={category} disabled={categoryLocked} onSelect={applyTemplate} />
+    <p className="template-notice" aria-live="polite">{templateNotice}</p>
 
     <div className={displayedResponse ? 'request-layout has-plan' : 'request-layout'}>
       <form className="request-form" onSubmit={handleSubmit}>
         <label htmlFor="manager-task">レンへの依頼内容</label>
-        <textarea ref={textareaRef} id="manager-task" value={task} onChange={(event) => setTask(event.target.value)} maxLength={MAX_TASK_LENGTH} rows={6} disabled={isLoading || isStaticDemo} placeholder="例：AIエンジニアへの転職に向けて、次の改善作業を整理してください" aria-describedby="task-hint task-count" />
+        <textarea ref={textareaRef} id="manager-task" value={task} onChange={(event) => { setTask(event.target.value); setTemplateNotice(''); }} maxLength={MAX_TASK_LENGTH} rows={6} disabled={isLoading} placeholder="例：AIエンジニアへの転職に向けて、次の改善作業を整理してください" aria-describedby="task-hint task-count" />
         <div className="request-meta"><small id="task-hint">具体的な目的や条件を含めると、担当計画が明確になります。</small><span id="task-count">残り {MAX_TASK_LENGTH - task.length} 文字</span></div>
         <button className="request-submit" type="submit" disabled={isDisabled}>{isLoading ? <><span className="spinner" aria-hidden="true" />レンが整理中...</> : 'レンに依頼する'}</button>
         {status === 'loading' && <p className="request-status" role="status" aria-live="polite">レンが依頼を確認し、担当者と最初の作業を整理しています。</p>}

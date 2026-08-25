@@ -5,6 +5,7 @@ import { App } from '../App';
 import type { ManagerApiResponse } from '../types/manager';
 import type { WorkResponse } from '../types/work';
 import { TaskRequestSection } from './TaskRequestSection';
+import { requestTemplatesByCategory } from '../data/requestTemplates';
 
 const task = 'AIエンジニアへの転職に向けて、次の作業を整理してください';
 const apiResponse: ManagerApiResponse = {
@@ -44,6 +45,63 @@ describe('TaskRequestSection', () => {
     expect(screen.getByText('残り 2000 文字')).toBeInTheDocument();
     await user.click(button);
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('shows general templates initially and switches them with the category', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    expect(screen.getByRole('button', { name: '今日の優先順位を依頼欄へ反映' })).toBeInTheDocument();
+    expect(screen.getAllByText('このテンプレートを使う')).toHaveLength(3);
+    await user.click(screen.getByRole('radio', { name: 'AI学習' }));
+    expect(screen.getByRole('button', { name: '7日間の学習計画を依頼欄へ反映' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '今日の優先順位を依頼欄へ反映' })).not.toBeInTheDocument();
+  });
+
+  it('applies a template, focuses the textarea, announces it, and does not submit', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<TaskRequestSection status="idle" response={null} error={null} onSubmit={onSubmit} onSelectEmployee={vi.fn()} isStaticDemo={false} />);
+    await user.click(screen.getByRole('button', { name: '今日の優先順位を依頼欄へ反映' }));
+    expect(screen.getByLabelText('レンへの依頼内容')).toHaveValue(requestTemplatesByCategory.general[0].prompt);
+    expect(screen.getByLabelText('レンへの依頼内容')).toHaveFocus();
+    expect(screen.getByText(/テンプレートを依頼欄へ反映しました/)).toBeInTheDocument();
+    expect(screen.getByText(`残り ${2_000 - requestTemplatesByCategory.general[0].prompt.length} 文字`)).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('supports keyboard template selection', async () => {
+    const user = userEvent.setup();
+    render(<TaskRequestSection status="idle" response={null} error={null} onSubmit={vi.fn()} onSelectEmployee={vi.fn()} isStaticDemo={false} />);
+    const template = screen.getByRole('button', { name: '会議の準備を依頼欄へ反映' });
+    template.focus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByLabelText('レンへの依頼内容')).toHaveValue(requestTemplatesByCategory.general[1].prompt);
+  });
+
+  it('allows public-demo template editing without API communication', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    render(<App runtimeMode="public-demo" />);
+    await user.click(screen.getByRole('button', { name: '作業手順の改善を依頼欄へ反映' }));
+    const input = screen.getByLabelText('レンへの依頼内容');
+    expect(input).toHaveValue(requestTemplatesByCategory.general[2].prompt);
+    expect(input).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'レンに依頼する' })).toBeDisabled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('sends a template task with its selected category in local-ai mode', async () => {
+    const user = userEvent.setup();
+    const developmentResponse = { ...apiResponse, category: 'development' as const };
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify(developmentResponse), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<App runtimeMode="local-ai" />);
+    await user.click(screen.getByRole('radio', { name: 'ソフトウェア開発' }));
+    await user.click(screen.getByRole('button', { name: 'APIの安全性改善を依頼欄へ反映' }));
+    await user.click(screen.getByRole('button', { name: 'レンに依頼する' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ category: 'development', task: requestTemplatesByCategory.development[0].prompt });
   });
 
   it('posts the normalized task and shows the structured plan', async () => {

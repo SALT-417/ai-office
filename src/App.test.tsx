@@ -14,8 +14,9 @@ describe('AI OFFICE', () => {
   it('switches all modes and updates the dialogue', async () => {
     const user = userEvent.setup();
     render(<App />);
+    const modeNavigation = screen.getByRole('navigation', { name: 'オフィスモード' });
     for (const [mode, status] of [['移動', '社員がオフィス内を移動中'], ['休憩', 'ラウンジでリフレッシュ中'], ['会議', '全員で企画会議中'], ['夜間', '夜間担当が仕上げ作業中']] as const) {
-      await user.click(screen.getByRole('button', { name: new RegExp(mode) }));
+      await user.click(within(modeNavigation).getByRole('button', { name: mode }));
       expect(screen.getByText(status)).toBeInTheDocument();
     }
     expect(screen.getByText(/明日の判断が速くなるよう/)).toBeInTheDocument();
@@ -32,7 +33,7 @@ describe('AI OFFICE', () => {
   it('restores valid state and clamps persisted values', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ mode: 'meeting', selectedEmployeeId: 'sou', employeeProgress: { ren: 200, mio: 40, sou: 30, yuna: 35, aki: -2 } }));
     render(<App />);
-    expect(screen.getByRole('button', { name: /会議/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(screen.getByRole('navigation', { name: 'オフィスモード' })).getByRole('button', { name: '会議' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('heading', { name: 'ソウ' })).toBeInTheDocument();
     expect(screen.getByText('100%')).toBeInTheDocument();
   });
