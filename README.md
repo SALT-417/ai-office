@@ -13,7 +13,7 @@
 - モード、選択社員、社員進捗のlocalStorage保存
 - デスクトップとモバイルに対応したレスポンシブ表示
 - キーボード操作、フォーカス表示、ARIA、モーション軽減対応
-- ローカルOllama経由でレンが依頼を受け付けるExpress API
+- 画面からレンへ依頼し、担当者と最初の作業を確認できるローカルAI機能
 
 ## Windowsでの起動手順
 
@@ -60,6 +60,8 @@ npm run dev
 - ローカルAPI：`http://127.0.0.1:8787/api/manager`
 - Ollama API：`http://127.0.0.1:11434/api/chat`
 
+画面下部の「AIへ仕事を依頼」に内容を入力し、「レンに依頼する」を選択します。結果の担当者カードを選ぶと、既存の社員詳細パネルもその社員へ切り替わります。
+
 Express APIだけを起動する場合は次を使用します。
 
 ```powershell
@@ -95,7 +97,7 @@ npm run dev
 
 ### GitHub Pages版について
 
-[GitHub Pages版](https://salt-417.github.io/ai-office/)は静的なデモ表示のみです。GitHub PagesはExpressやOllamaを実行しないため、`POST /api/manager`は利用できません。ローカルAI機能は、利用者のPC上でOllamaと`npm run dev`を起動した場合だけ動作します。現段階ではAI依頼用の画面UIも追加していません。
+[GitHub Pages版](https://salt-417.github.io/ai-office/)は静的なデモ表示のみです。GitHub PagesはExpressやOllamaを実行しないため、依頼欄にはその旨を表示し、送信ボタンを無効にしています。5モード、社員選択、進捗変更など既存のデモ機能は引き続き操作できます。ローカルAI機能は、利用者のPC上でOllamaと`npm run dev`を起動した場合だけ動作します。
 
 ## 品質確認コマンド
 
