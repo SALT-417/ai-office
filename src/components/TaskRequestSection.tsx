@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { employeeById, employees } from '../data/employees';
 import type { EmployeeId } from '../types/office';
 import type { ManagerApiResponse, ManagerEmployeeName, ManagerRequestStatus } from '../types/manager';
@@ -19,15 +19,23 @@ interface Props {
   workError?: string | null;
   onExecute?: (task: string, employeeIds: EmployeeId[]) => void;
   onCancelWork?: () => void;
+  taskToRestore?: { value: string; token: number } | null;
   isStaticDemo?: boolean;
 }
 
-export function TaskRequestSection({ status, response, error, onSubmit, onSelectEmployee, workStatus = 'idle', workResponse = null, workError = null, onExecute = () => undefined, onCancelWork = () => undefined, isStaticDemo = import.meta.env.PROD }: Props) {
+export function TaskRequestSection({ status, response, error, onSubmit, onSelectEmployee, workStatus = 'idle', workResponse = null, workError = null, onExecute = () => undefined, onCancelWork = () => undefined, taskToRestore = null, isStaticDemo = import.meta.env.PROD }: Props) {
   const [task, setTask] = useState('');
   const [plannedTask, setPlannedTask] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const normalizedTask = task.trim();
   const isLoading = status === 'loading';
   const isDisabled = normalizedTask.length === 0 || isLoading || isStaticDemo;
+
+  useEffect(() => {
+    if (!taskToRestore) return;
+    setTask(taskToRestore.value);
+    textareaRef.current?.focus();
+  }, [taskToRestore]);
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -48,7 +56,7 @@ export function TaskRequestSection({ status, response, error, onSubmit, onSelect
     <div className={response ? 'request-layout has-plan' : 'request-layout'}>
       <form className="request-form" onSubmit={handleSubmit}>
         <label htmlFor="manager-task">レンへの依頼内容</label>
-        <textarea id="manager-task" value={task} onChange={(event) => setTask(event.target.value)} maxLength={MAX_TASK_LENGTH} rows={6} disabled={isLoading || isStaticDemo} placeholder="例：AIエンジニアへの転職に向けて、次の改善作業を整理してください" aria-describedby="task-hint task-count" />
+        <textarea ref={textareaRef} id="manager-task" value={task} onChange={(event) => setTask(event.target.value)} maxLength={MAX_TASK_LENGTH} rows={6} disabled={isLoading || isStaticDemo} placeholder="例：AIエンジニアへの転職に向けて、次の改善作業を整理してください" aria-describedby="task-hint task-count" />
         <div className="request-meta"><small id="task-hint">具体的な目的や条件を含めると、担当計画が明確になります。</small><span id="task-count">残り {MAX_TASK_LENGTH - task.length} 文字</span></div>
         <button className="request-submit" type="submit" disabled={isDisabled}>{isLoading ? <><span className="spinner" aria-hidden="true" />レンが整理中...</> : 'レンに依頼する'}</button>
         {status === 'loading' && <p className="request-status" role="status" aria-live="polite">レンが依頼を確認し、担当者と最初の作業を整理しています。</p>}

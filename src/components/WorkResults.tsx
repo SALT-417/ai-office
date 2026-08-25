@@ -12,7 +12,7 @@ interface Props {
   isStaticDemo: boolean;
 }
 
-function SafeWorkContent({ content }: { content: string }) {
+export function SafeWorkContent({ content }: { content: string }) {
   return <div className="work-content">{content.split('\n').map((line, index) => {
     const trimmed = line.trim();
     const isHeading = /^#{1,3}\s/.test(trimmed);

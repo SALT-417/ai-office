@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { EmployeeId } from '../types/office';
 import type { SpecialistEmployeeId, WorkRequestStatus, WorkResponse, WorkResult } from '../types/work';
+import { createHistoryId } from '../utils/workHistoryStorage';
 
 const CLIENT_TIMEOUT_MS = 100_000;
 const specialistIds: SpecialistEmployeeId[] = ['mio', 'sou', 'yuna', 'aki'];
@@ -37,6 +38,7 @@ export function useWorkRequest() {
   const [response, setResponse] = useState<WorkResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [targetEmployeeIds, setTargetEmployeeIds] = useState<EmployeeId[]>([]);
+  const [completionId, setCompletionId] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
 
@@ -55,6 +57,7 @@ export function useWorkRequest() {
     setResponse(null);
     setError(null);
     setTargetEmployeeIds([]);
+    setCompletionId(null);
   };
 
   const cancel = () => {
@@ -71,12 +74,14 @@ export function useWorkRequest() {
   const execute = async (task: string, expectedEmployeeIds: EmployeeId[]) => {
     controllerRef.current?.abort();
     const controller = new AbortController();
+    const executionId = createHistoryId();
     controllerRef.current = controller;
     const timeout = window.setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
     setStatus('loading');
     setResponse(null);
     setError(null);
     setTargetEmployeeIds(expectedEmployeeIds.length ? expectedEmployeeIds : ['sou']);
+    setCompletionId(null);
     try {
       const apiResponse = await fetch('/api/work', {
         method: 'POST',
@@ -90,6 +95,7 @@ export function useWorkRequest() {
       if (mountedRef.current && controllerRef.current === controller) {
         setResponse(body);
         setTargetEmployeeIds(body.results.map((result) => result.employeeId));
+        setCompletionId(executionId);
         setStatus('success');
       }
     } catch (requestError) {
@@ -105,5 +111,5 @@ export function useWorkRequest() {
     }
   };
 
-  return { status, response, error, targetEmployeeIds, execute, cancel, reset };
+  return { status, response, error, targetEmployeeIds, completionId, execute, cancel, reset };
 }
