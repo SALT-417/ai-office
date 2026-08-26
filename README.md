@@ -8,6 +8,8 @@ GitHub Pages版は、API・Ollamaへ通信しない安全な`public-demo`です�
 
 [GitHub Repository](https://github.com/SALT-417/ai-office)
 
+![AI OFFICE overview](docs/images/ai-office-overview.png)
+
 ## Key Highlights
 
 - **5 Specialized AI Employees**：計画、キャリア、開発、UI/UX、品質の固定役割で依頼を分担
