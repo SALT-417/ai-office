@@ -35,6 +35,15 @@ export interface ObsidianSaveConfig {
   now?: () => Date;
 }
 
+export interface ObsidianStatusResult {
+  available: boolean;
+  vaultSaveEnabled: boolean;
+  exportSubdir: string;
+  dailyNotesEnabled: boolean;
+  dailyNotesSubdir: string;
+  message: string;
+}
+
 export class ObsidianSaveError extends Error {
   constructor(public readonly status: number, public readonly publicMessage: string) {
     super(publicMessage);
@@ -81,6 +90,49 @@ function dailySubdirectoryParts(value: string | undefined): string[] {
   } catch {
     throw new ObsidianSaveError(503, 'Dailyノート保存先の設定が正しくありません。');
   }
+}
+
+function displaySubdirectory(parts: string[]): string {
+  return parts.length ? parts.join('/') : 'Vault直下';
+}
+
+export function getObsidianStatus(config: ObsidianSaveConfig = {}): ObsidianStatusResult {
+  const vaultConfigured = Boolean(config.vaultDir?.trim());
+  let exportParts: string[];
+  let dailyParts: string[];
+  try {
+    exportParts = subdirectoryParts(config.exportSubdir);
+    dailyParts = dailySubdirectoryParts(config.dailyNotesSubdir);
+  } catch {
+    return {
+      available: false,
+      vaultSaveEnabled: false,
+      exportSubdir: '設定不正',
+      dailyNotesEnabled: false,
+      dailyNotesSubdir: '設定不正',
+      message: 'Obsidianの保存先サブフォルダ設定が正しくないため、Vault保存は無効です。',
+    };
+  }
+  if (!vaultConfigured) {
+    return {
+      available: false,
+      vaultSaveEnabled: false,
+      exportSubdir: displaySubdirectory(exportParts),
+      dailyNotesEnabled: false,
+      dailyNotesSubdir: displaySubdirectory(dailyParts),
+      message: 'OBSIDIAN_VAULT_DIR が未設定のため、Vault保存は無効です。',
+    };
+  }
+  return {
+    available: true,
+    vaultSaveEnabled: true,
+    exportSubdir: displaySubdirectory(exportParts),
+    dailyNotesEnabled: Boolean(config.dailyNotesEnabled),
+    dailyNotesSubdir: displaySubdirectory(dailyParts),
+    message: config.dailyNotesEnabled
+      ? 'Vault保存と、確認時に選択したDailyノート追記を利用できます。'
+      : 'Vault保存を利用できます。Dailyノート追記は設定で無効です。',
+  };
 }
 
 interface ValidDailyNote {

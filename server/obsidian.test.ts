@@ -1,8 +1,8 @@
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { MAX_OBSIDIAN_MARKDOWN_BYTES, ObsidianSaveError, saveObsidianMarkdown, type ObsidianSaveInput } from './obsidian';
+import { getObsidianStatus, MAX_OBSIDIAN_MARKDOWN_BYTES, ObsidianSaveError, saveObsidianMarkdown, type ObsidianSaveInput } from './obsidian';
 
 const cleanup: string[] = [];
 
@@ -17,6 +17,33 @@ afterEach(async () => {
 });
 
 describe('Obsidian Vault save safety', () => {
+  it('reports disabled defaults without revealing the Vault path', () => {
+    expect(getObsidianStatus()).toEqual({ available: false, vaultSaveEnabled: false, exportSubdir: 'AI OFFICE', dailyNotesEnabled: false, dailyNotesSubdir: 'Daily', message: 'OBSIDIAN_VAULT_DIR が未設定のため、Vault保存は無効です。' });
+  });
+
+  it('reports configured Vault and Daily states using relative labels only', () => {
+    const enabled = getObsidianStatus({ vaultDir: 'C:\\Users\\private\\Vault', exportSubdir: 'AI OFFICE', dailyNotesEnabled: true, dailyNotesSubdir: 'Daily' });
+    expect(enabled).toMatchObject({ available: true, vaultSaveEnabled: true, exportSubdir: 'AI OFFICE', dailyNotesEnabled: true, dailyNotesSubdir: 'Daily' });
+    expect(JSON.stringify(enabled)).not.toContain('C:\\Users');
+    expect(getObsidianStatus({ vaultDir: 'configured', dailyNotesEnabled: false }).dailyNotesEnabled).toBe(false);
+  });
+
+  it('does not create a Vault or subdirectory while checking status', async () => {
+    const parent = await temporaryDirectory('ai-office-status-');
+    const missingVault = path.join(parent, 'missing-vault');
+    expect(getObsidianStatus({ vaultDir: missingVault, exportSubdir: 'AI OFFICE', dailyNotesSubdir: 'Daily' }).available).toBe(true);
+    await expect(access(missingVault)).rejects.toBeTruthy();
+  });
+
+  it.each([
+    [{ vaultDir: 'configured', exportSubdir: '../outside' }],
+    [{ vaultDir: 'configured', dailyNotesSubdir: 'Daily\\mixed/path' }],
+  ])('safely disables status for invalid subdirectory settings', (config) => {
+    const status = getObsidianStatus(config);
+    expect(status).toMatchObject({ available: false, vaultSaveEnabled: false, dailyNotesEnabled: false });
+    expect(status.message).toContain('設定が正しくない');
+    expect(JSON.stringify(status)).not.toMatch(/stack|C:\\/i);
+  });
   it('rejects an unset Vault directory without exposing an absolute path', async () => {
     await expect(saveObsidianMarkdown({ filename: 'note.md', markdown: '# note' }, {})).rejects.toMatchObject({ status: 503 });
     try { await saveObsidianMarkdown({ filename: 'note.md', markdown: '# note' }, {}); } catch (error) {

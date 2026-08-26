@@ -4,7 +4,7 @@ import { ManagerError, MAX_TASK_LENGTH, requestManagerReply, type ManagerReply }
 import { requestWork, type WorkResponse } from './work';
 import { listProjectFiles, ProjectAnalysisError, requestProjectAnalysis, type AnalysisResponse, type AnalyzeRequest, type ProjectFileInfo } from './project-analysis';
 import { isWorkCategory, type WorkCategory } from '../shared/workCategories';
-import { getObsidianSaveConfig, ObsidianSaveError, saveObsidianMarkdown, type ObsidianSaveConfig, type ObsidianSaveInput, type ObsidianSaveResult } from './obsidian';
+import { getObsidianSaveConfig, getObsidianStatus, ObsidianSaveError, saveObsidianMarkdown, type ObsidianSaveConfig, type ObsidianSaveInput, type ObsidianSaveResult, type ObsidianStatusResult } from './obsidian';
 
 export interface AppDependencies {
   config?: ServerConfig;
@@ -14,6 +14,7 @@ export interface AppDependencies {
   analysisReply?: (input: AnalyzeRequest, signal?: AbortSignal) => Promise<AnalysisResponse>;
   obsidianConfig?: ObsidianSaveConfig;
   obsidianSave?: (input: ObsidianSaveInput, config: ObsidianSaveConfig) => Promise<ObsidianSaveResult>;
+  obsidianStatus?: (config: ObsidianSaveConfig) => ObsidianStatusResult;
 }
 
 export function createApp(dependencies: AppDependencies = {}) {
@@ -24,6 +25,7 @@ export function createApp(dependencies: AppDependencies = {}) {
   const analysisReply = dependencies.analysisReply ?? ((input: AnalyzeRequest, signal?: AbortSignal) => requestProjectAnalysis(input, config, fetch, signal));
   const obsidianConfig = dependencies.obsidianConfig ?? getObsidianSaveConfig();
   const obsidianSave = dependencies.obsidianSave ?? saveObsidianMarkdown;
+  const obsidianStatus = dependencies.obsidianStatus ?? getObsidianStatus;
   const app = express();
 
   app.disable('x-powered-by');
@@ -133,6 +135,10 @@ export function createApp(dependencies: AppDependencies = {}) {
       console.error('[AI OFFICE API] Obsidian save failed:', error instanceof Error ? error.message : 'Unknown error');
       response.status(500).json({ error: 'Obsidian用Markdownを保存できませんでした。' });
     }
+  });
+
+  app.get('/api/obsidian/status', (_request, response) => {
+    response.json(obsidianStatus(obsidianConfig));
   });
 
   const errorHandler: ErrorRequestHandler = (error, _request, response, next) => {

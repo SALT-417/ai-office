@@ -185,3 +185,18 @@ describe('POST /api/obsidian/save', () => {
     expect(body).not.toMatch(/[A-Z]:\\|stack/i);
   });
 });
+
+describe('GET /api/obsidian/status', () => {
+  it('returns only the safe status projection', async () => {
+    const obsidianStatus = vi.fn().mockReturnValue({ available: true, vaultSaveEnabled: true, exportSubdir: 'AI OFFICE', dailyNotesEnabled: true, dailyNotesSubdir: 'Daily', message: 'Vault保存を利用できます。' });
+    server = createApp({ obsidianConfig: { vaultDir: 'C:\\Users\\private\\Vault' }, obsidianStatus }).listen(0, '127.0.0.1');
+    await new Promise<void>((resolve) => server?.once('listening', resolve));
+    const address = server.address() as AddressInfo;
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/obsidian/status`);
+    const body = await response.json();
+    expect(body).toMatchObject({ available: true, exportSubdir: 'AI OFFICE', dailyNotesEnabled: true });
+    expect(JSON.stringify(body)).not.toContain('C:\\Users');
+    expect(JSON.stringify(body)).not.toContain('stack');
+    expect(obsidianStatus).toHaveBeenCalledWith({ vaultDir: 'C:\\Users\\private\\Vault' });
+  });
+});

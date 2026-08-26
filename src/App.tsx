@@ -8,6 +8,7 @@ import { TaskRequestSection } from './components/TaskRequestSection';
 import { WorkHistorySection } from './components/WorkHistorySection';
 import { ProjectAnalysisSection } from './components/ProjectAnalysisSection';
 import { PublicDemoOverview } from './components/PublicDemoOverview';
+import { ObsidianStatusPanel } from './components/ObsidianStatusPanel';
 import { employeeById, employees } from './data/employees';
 import { useManagerRequest } from './hooks/useManagerRequest';
 import { usePersistentOfficeState } from './hooks/usePersistentOfficeState';
@@ -18,7 +19,7 @@ import type { WorkCategory } from '../shared/workCategories';
 import { calculateOverallProgress } from './utils/progress';
 import { appRuntimeMode, type AppRuntimeMode } from './utils/runtimeMode';
 
-export function App({ runtimeMode = appRuntimeMode }: { runtimeMode?: AppRuntimeMode }) {
+export function App({ runtimeMode = appRuntimeMode, showObsidianStatus = false }: { runtimeMode?: AppRuntimeMode; showObsidianStatus?: boolean }) {
   const { state, selectMode, selectEmployee, updateProgress } = usePersistentOfficeState();
   const managerRequest = useManagerRequest(runtimeMode);
   const workRequest = useWorkRequest(runtimeMode);
@@ -45,6 +46,7 @@ export function App({ runtimeMode = appRuntimeMode }: { runtimeMode?: AppRuntime
       <EmployeeRoster selectedId={state.selectedEmployeeId} progress={state.employeeProgress} onSelect={selectEmployee} />
       <TaskRequestSection runtimeMode={runtimeMode} category={workCategory.category} categoryStorageError={workCategory.storageError} onCategoryChange={(category) => { managerRequest.reset(); workRequest.reset(); workCategory.setCategory(category); }} status={managerRequest.status} response={managerRequest.response} error={managerRequest.error} onSubmit={(task, category) => { workRequest.reset(); return managerRequest.submit(task, category); }} onSelectEmployee={selectEmployee} workStatus={workRequest.status} workResponse={workRequest.response} workError={workRequest.error} onExecute={workRequest.execute} onCancelWork={workRequest.cancel} taskToRestore={taskToRestore} />
       <ProjectAnalysisSection runtimeMode={runtimeMode} />
+      {showObsidianStatus && <ObsidianStatusPanel runtimeMode={runtimeMode} />}
       <WorkHistorySection runtimeMode={runtimeMode} entries={history.entries} selectedEntry={history.selectedEntry} storageError={history.storageError} onSelect={history.selectEntry} onReview={history.updateReview} onDeleteOne={history.removeOne} onDeleteAll={history.removeAll} onRestoreTask={(task, category) => { workCategory.setCategory(category); managerRequest.reset(); workRequest.reset(); setTaskToRestore((current) => ({ value: task, category, token: (current?.token ?? 0) + 1 })); }} onSelectEmployee={selectEmployee} />
     </main>
     <footer><span>AI OFFICE</span><p>Planning · Design · Development · Quality</p><small>Local-first portfolio experience</small></footer>

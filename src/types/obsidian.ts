@@ -17,3 +17,14 @@ export interface ObsidianDailyNoteRequest {
   summary: string;
   employees: string[];
 }
+
+export interface ObsidianStatusResponse {
+  available: boolean;
+  vaultSaveEnabled: boolean;
+  exportSubdir: string;
+  dailyNotesEnabled: boolean;
+  dailyNotesSubdir: string;
+  message: string;
+}
+
+export type ObsidianStatusRequestState = 'idle' | 'loading' | 'success' | 'error';
