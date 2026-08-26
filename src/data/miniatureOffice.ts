@@ -29,3 +29,19 @@ export const autonomousRoutes: Record<'work' | 'walk', Record<EmployeeId, Miniat
     ren: ['aisle-left', 'aisle-back', 'aisle-center'], mio: ['aisle-back', 'aisle-right', 'aisle-front'], sou: ['aisle-right', 'aisle-center', 'aisle-left'], yuna: ['aisle-front', 'aisle-right', 'aisle-center'], aki: ['aisle-center', 'aisle-left', 'aisle-front'],
   },
 };
+
+export const employeeSpeech: Record<EmployeeId, readonly string[]> = {
+  ren: ['整理します', '優先度確認', '進捗見ます'],
+  mio: ['応募軸確認', '情報整理', '次の一手'],
+  sou: ['実装確認', 'API確認', '型を確認'],
+  yuna: ['見せ方調整', '文章整理', 'UI確認'],
+  aki: ['品質確認', 'テスト確認', '安全確認'],
+};
+
+export const modeSpeech: Record<OfficeMode, readonly string[]> = {
+  work: [],
+  walk: ['次へ移動', '資料を確認'],
+  break: ['少し休憩', 'メモ整理'],
+  meeting: ['共有します', '相談中'],
+  night: ['静かに確認', '最終チェック'],
+};

@@ -58,12 +58,50 @@ describe('OfficeView', () => {
     const { rerender } = render(<OfficeView {...baseProps} workStatus="loading" workTargetEmployeeIds={['sou']} />);
     fireEvent.click(screen.getByRole('button', { name: 'ミニチュア' }));
     const sou = screen.getByRole('button', { name: /ソウ、AI開発担当、作業中/ });
-    expect(within(sou).getAllByText('作業中')).toHaveLength(2);
+    expect(sou.querySelector('.miniature-speech')).toHaveTextContent('作業中');
+    expect(within(sou).getAllByText('作業中').length).toBeGreaterThanOrEqual(2);
     expect(sou).toHaveAttribute('data-destination', 'desk-sou');
 
     const response: WorkResponse = { coordinator: 'レン', category: 'development', task: '実装確認', results: [{ employeeId: 'sou', name: 'ソウ', role: 'AI開発担当', status: 'completed', title: '成果', content: '内容' }] };
     rerender(<OfficeView {...baseProps} workStatus="success" workResponse={response} />);
-    expect(within(screen.getByRole('button', { name: /ソウ、AI開発担当、完了/ })).getAllByText('完了')).toHaveLength(2);
+    const completedSou = screen.getByRole('button', { name: /ソウ、AI開発担当、完了/ });
+    expect(completedSou.querySelector('.miniature-speech')).toHaveTextContent('完了しました');
+    expect(within(completedSou).getAllByText('完了').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('通常時は一部社員だけが決定的に短い吹き出しを表示する', () => {
+    vi.useFakeTimers();
+    render(<OfficeView {...baseProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'ミニチュア' }));
+    expect(document.querySelectorAll('.miniature-speech')).toHaveLength(2);
+    expect(screen.getByText('整理します')).toBeInTheDocument();
+    expect(screen.getByText('実装確認')).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(6000));
+    expect(document.querySelectorAll('.miniature-speech')).toHaveLength(2);
+    expect(screen.getByText('情報整理')).toBeInTheDocument();
+  });
+
+  it('依頼・担当・失敗状態を優先した吹き出しへ切り替える', () => {
+    const { rerender } = render(<OfficeView {...baseProps} managerStatus="loading" />);
+    fireEvent.click(screen.getByRole('button', { name: 'ミニチュア' }));
+    expect(screen.getByRole('button', { name: /レン、マネージャー、整理中/ }).querySelector('.miniature-speech')).toHaveTextContent('整理中...');
+
+    rerender(<OfficeView {...baseProps} managerStatus="success" assignedEmployeeIds={['mio']} />);
+    expect(screen.getByRole('button', { name: /ミオ、キャリア担当、担当予定/ }).querySelector('.miniature-speech')).toHaveTextContent('担当します');
+
+    const failedResponse: WorkResponse = { coordinator: 'レン', category: 'development', task: '確認', results: [{ employeeId: 'aki', name: 'アキ', role: '品質管理担当', status: 'failed', title: '確認', content: '', error: '処理できませんでした。' }] };
+    rerender(<OfficeView {...baseProps} workStatus="success" workResponse={failedResponse} />);
+    expect(screen.getByRole('button', { name: /アキ、品質管理担当、失敗/ }).querySelector('.miniature-speech')).toHaveTextContent('確認が必要');
+  });
+
+  it.each([
+    ['meeting', '共有します'],
+    ['break', '少し休憩'],
+    ['night', '静かに確認'],
+  ] as const)('%sモードで専用の吹き出しを表示する', (mode, speech) => {
+    render(<OfficeView {...baseProps} mode={mode} />);
+    fireEvent.click(screen.getByRole('button', { name: 'ミニチュア' }));
+    expect(screen.getAllByText(speech).length).toBeGreaterThan(0);
   });
 
   it('業務中は決定的な巡回で一部社員だけを移動させる', () => {
@@ -95,8 +133,9 @@ describe('OfficeView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ミニチュア' }));
     expect(screen.getByText('OS設定で移動停止中')).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: '自律移動 OFF' })).toHaveAttribute('aria-checked', 'false');
-    expect(intervalSpy).not.toHaveBeenCalled();
+    expect(intervalSpy.mock.calls.some(([, delay]) => delay === 5000)).toBe(false);
     expect(document.querySelectorAll('.miniature-employee[data-state="moving"]')).toHaveLength(0);
+    expect(document.querySelectorAll('.miniature-speech')).toHaveLength(2);
   });
 
   it('移動をアプリ内でOFFにして保存し、再表示時に復元する', () => {

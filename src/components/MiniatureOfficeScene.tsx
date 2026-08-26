@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { employees } from '../data/employees';
-import { autonomousRoutes, employeeDeskPoints, miniaturePoints, modeDestinations, type MiniaturePointId } from '../data/miniatureOffice';
+import { autonomousRoutes, employeeDeskPoints, employeeSpeech, miniaturePoints, modeDestinations, modeSpeech, type MiniaturePointId } from '../data/miniatureOffice';
 import { modeById } from '../data/modes';
 import type { EmployeeId, OfficeMode } from '../types/office';
 import type { ManagerRequestStatus } from '../types/manager';
@@ -11,6 +11,7 @@ interface Props { mode: OfficeMode; selectedId: EmployeeId; progress: number; on
 type MiniActivity = 'working' | 'completed' | 'failed' | 'processing' | 'assigned';
 
 const activityLabels: Record<MiniActivity, string> = { working: '作業中', completed: '完了', failed: '失敗', processing: '整理中', assigned: '担当予定' };
+const activitySpeech: Record<MiniActivity, string> = { working: '作業中', completed: '完了しました', failed: '確認が必要', processing: '整理中...', assigned: '担当します' };
 const MOTION_STORAGE_KEY = 'ai-office-miniature-motion-v1';
 
 function loadMotionPreference(): boolean | null {
@@ -44,6 +45,7 @@ export function MiniatureOfficeScene({ mode, selectedId, progress, onSelect, man
   const motionEnabled = motionPreference ?? !reducedMotion;
   const [destinations, setDestinations] = useState<Record<EmployeeId, MiniaturePointId>>(() => ({ ...modeDestinations[mode] }));
   const [movingIds, setMovingIds] = useState<EmployeeId[]>([]);
+  const [speechStep, setSpeechStep] = useState(0);
   const routeStep = useRef(0);
   const activityById = useMemo(() => Object.fromEntries(employees.map((employee) => {
     const result = workResponse?.results.find((item) => item.employeeId === employee.id);
@@ -97,6 +99,17 @@ export function MiniatureOfficeScene({ mode, selectedId, progress, onSelect, man
     };
   }, [activityById, mode, motionEnabled, selectedId]);
 
+  useEffect(() => {
+    const interval = window.setInterval(() => setSpeechStep((current) => current + 1), 6000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const normalSpeakers = useMemo(() => {
+    const first = employees[speechStep % employees.length].id;
+    const second = employees[(speechStep + 2) % employees.length].id;
+    return new Set<EmployeeId>([first, second]);
+  }, [speechStep]);
+
   const motionStatus = motionEnabled ? '自律移動中' : motionPreference === false ? 'アプリ設定で移動停止中' : 'OS設定で移動停止中';
   const toggleMotion = () => {
     const enabled = !motionEnabled;
@@ -124,8 +137,14 @@ export function MiniatureOfficeScene({ mode, selectedId, progress, onSelect, man
         const position = miniaturePoints[destination];
         const moving = movingIds.includes(employee.id) && activity !== 'failed';
         const stateLabel = activity ? activityLabels[activity] : position.zone;
+        const modeLines = modeSpeech[mode];
+        const speech = activity ? activitySpeech[activity]
+          : normalSpeakers.has(employee.id)
+            ? modeLines.length ? modeLines[employees.findIndex(({ id }) => id === employee.id) % modeLines.length] : employeeSpeech[employee.id][speechStep % employeeSpeech[employee.id].length]
+            : null;
         const style = { '--mini-x': `${position.x}%`, '--mini-y': `${position.y}%`, '--mini-layer': Math.round(position.y) + 8 } as CSSProperties;
         return <button key={employee.id} type="button" className={`miniature-employee miniature-${employee.id}${employee.id === selectedId ? ' selected' : ''}${activity ? ` ${activity}` : ''}${moving ? ' moving' : ''}`} style={style} data-destination={destination} data-state={activity ?? (moving ? 'moving' : 'idle')} onClick={() => onSelect(employee.id)} aria-label={`${employee.name}、${employee.role}、${stateLabel}。詳細を表示`}>
+          {speech && <span className="miniature-speech" aria-hidden="true">{speech}</span>}
           {activity && <span className="miniature-activity">{activityLabels[activity]}</span>}
           <span className="miniature-avatar" aria-hidden="true">
             <i className="mini-person-leg leg-left" /><i className="mini-person-leg leg-right" />
