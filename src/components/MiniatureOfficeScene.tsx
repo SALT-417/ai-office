@@ -1,5 +1,6 @@
-import type { CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { employees } from '../data/employees';
+import { autonomousRoutes, employeeDeskPoints, miniaturePoints, modeDestinations, type MiniaturePointId } from '../data/miniatureOffice';
 import { modeById } from '../data/modes';
 import type { EmployeeId, OfficeMode } from '../types/office';
 import type { ManagerRequestStatus } from '../types/manager';
@@ -7,23 +8,83 @@ import type { WorkRequestStatus, WorkResponse } from '../types/work';
 import { ProgressBar } from './ProgressBar';
 
 interface Props { mode: OfficeMode; selectedId: EmployeeId; progress: number; onSelect: (id: EmployeeId) => void; managerStatus: ManagerRequestStatus; assignedEmployeeIds: EmployeeId[]; workStatus: WorkRequestStatus; workResponse: WorkResponse | null; workTargetEmployeeIds: EmployeeId[] }
-type MiniPosition = { x: number; y: number; zone: string };
 type MiniActivity = 'working' | 'completed' | 'failed' | 'processing' | 'assigned';
-
-const positions: Record<OfficeMode, Record<EmployeeId, MiniPosition>> = {
-  work: { ren: { x: 30, y: 30, zone: 'デスク' }, mio: { x: 55, y: 27, zone: 'デスク' }, sou: { x: 75, y: 42, zone: 'デスク' }, yuna: { x: 38, y: 62, zone: 'デスク' }, aki: { x: 68, y: 68, zone: 'デスク' } },
-  walk: { ren: { x: 29, y: 48, zone: '通路' }, mio: { x: 44, y: 38, zone: '通路' }, sou: { x: 58, y: 54, zone: '通路' }, yuna: { x: 70, y: 46, zone: '通路' }, aki: { x: 49, y: 69, zone: '通路' } },
-  break: { ren: { x: 68, y: 68, zone: 'ラウンジ' }, mio: { x: 78, y: 63, zone: 'ラウンジ' }, sou: { x: 59, y: 73, zone: 'ラウンジ' }, yuna: { x: 74, y: 78, zone: 'ラウンジ' }, aki: { x: 84, y: 73, zone: 'ラウンジ' } },
-  meeting: { ren: { x: 42, y: 47, zone: '会議席' }, mio: { x: 51, y: 39, zone: '会議席' }, sou: { x: 61, y: 47, zone: '会議席' }, yuna: { x: 53, y: 58, zone: '会議席' }, aki: { x: 43, y: 58, zone: '会議席' } },
-  night: { ren: { x: 31, y: 31, zone: '夜間デスク' }, mio: { x: 55, y: 27, zone: '待機席' }, sou: { x: 75, y: 42, zone: '夜間デスク' }, yuna: { x: 38, y: 62, zone: '待機席' }, aki: { x: 68, y: 68, zone: '夜間デスク' } },
-};
 
 const activityLabels: Record<MiniActivity, string> = { working: '作業中', completed: '完了', failed: '失敗', processing: '整理中', assigned: '担当予定' };
 
+function useReducedMotion() {
+  const [reduced, setReduced] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true);
+  useEffect(() => {
+    const query = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    if (!query) return;
+    const update = () => setReduced(query.matches);
+    update();
+    query.addEventListener?.('change', update);
+    return () => query.removeEventListener?.('change', update);
+  }, []);
+  return reduced;
+}
+
 export function MiniatureOfficeScene({ mode, selectedId, progress, onSelect, managerStatus, assignedEmployeeIds, workStatus, workResponse, workTargetEmployeeIds }: Props) {
   const activeMode = modeById[mode];
+  const reducedMotion = useReducedMotion();
+  const [destinations, setDestinations] = useState<Record<EmployeeId, MiniaturePointId>>(() => ({ ...modeDestinations[mode] }));
+  const [movingIds, setMovingIds] = useState<EmployeeId[]>([]);
+  const routeStep = useRef(0);
+  const activityById = useMemo(() => Object.fromEntries(employees.map((employee) => {
+    const result = workResponse?.results.find((item) => item.employeeId === employee.id);
+    const activity: MiniActivity | undefined = workStatus === 'loading' && workTargetEmployeeIds.includes(employee.id) ? 'working'
+      : result?.status === 'completed' ? 'completed' : result?.status === 'failed' ? 'failed'
+      : managerStatus === 'loading' && employee.id === 'ren' ? 'processing'
+      : managerStatus === 'success' && assignedEmployeeIds.includes(employee.id) ? 'assigned' : undefined;
+    return [employee.id, activity];
+  })) as Record<EmployeeId, MiniActivity | undefined>, [assignedEmployeeIds, managerStatus, workResponse, workStatus, workTargetEmployeeIds]);
+
+  useEffect(() => {
+    const next = { ...modeDestinations[mode] };
+    employees.forEach(({ id }) => {
+      const activity = activityById[id];
+      if (activity === 'processing') next[id] = 'center';
+      if (activity === 'working' || activity === 'completed') next[id] = employeeDeskPoints[id];
+      if (activity === 'assigned') next[id] = id === 'ren' ? 'center' : employeeDeskPoints[id];
+    });
+    setDestinations(next);
+    setMovingIds(reducedMotion ? [] : employees.filter(({ id }) => activityById[id] !== 'failed').map(({ id }) => id));
+    if (reducedMotion) return;
+    const arrival = window.setTimeout(() => setMovingIds([]), 1400);
+    return () => window.clearTimeout(arrival);
+  }, [activityById, mode, reducedMotion]);
+
+  useEffect(() => {
+    if (reducedMotion || (mode !== 'work' && mode !== 'walk')) return;
+    let arrival: number | undefined;
+    const interval = window.setInterval(() => {
+      const eligible = employees.filter(({ id }) => !activityById[id] && id !== selectedId);
+      if (!eligible.length) return;
+      const first = eligible[routeStep.current % eligible.length];
+      const second = eligible[(routeStep.current + 2) % eligible.length];
+      const movers = [...new Set([first.id, second.id])];
+      routeStep.current += 1;
+      setDestinations((current) => {
+        const next = { ...current };
+        movers.forEach((id) => {
+          const route = autonomousRoutes[mode][id];
+          next[id] = route[routeStep.current % route.length];
+        });
+        return next;
+      });
+      setMovingIds(movers);
+      if (arrival) window.clearTimeout(arrival);
+      arrival = window.setTimeout(() => setMovingIds((current) => current.filter((id) => !movers.includes(id))), 1400);
+    }, 5000);
+    return () => {
+      window.clearInterval(interval);
+      if (arrival) window.clearTimeout(arrival);
+    };
+  }, [activityById, mode, reducedMotion, selectedId]);
+
   return <section className="scene-shell miniature-scene-shell" aria-labelledby="miniature-scene-status">
-    <div className="scene-status"><span className="live-dot" /><strong>{activeMode.time}</strong><span id="miniature-scene-status">ミニチュア表示・{activeMode.status}</span></div>
+    <div className="scene-status"><span className="live-dot" /><strong>{activeMode.time}</strong><span id="miniature-scene-status">ミニチュア表示・{activeMode.status}</span><small className="miniature-motion-note">{reducedMotion ? '移動アニメーション停止中' : '自律移動中'}</small></div>
     <div className="miniature-office" data-mode={mode}>
       <div className="miniature-wall miniature-wall-left" aria-hidden="true" />
       <div className="miniature-wall miniature-wall-back" aria-hidden="true"><span>AI OFFICE</span><i className="miniature-window" /></div>
@@ -34,16 +95,13 @@ export function MiniatureOfficeScene({ mode, selectedId, progress, onSelect, man
       </div>
       <div className="miniature-night" aria-hidden="true" />
       {employees.map((employee) => {
-        const result = workResponse?.results.find((item) => item.employeeId === employee.id);
-        const activity: MiniActivity | undefined = workStatus === 'loading' && workTargetEmployeeIds.includes(employee.id) ? 'working'
-          : result?.status === 'completed' ? 'completed'
-          : result?.status === 'failed' ? 'failed'
-          : managerStatus === 'loading' && employee.id === 'ren' ? 'processing'
-          : managerStatus === 'success' && assignedEmployeeIds.includes(employee.id) ? 'assigned' : undefined;
-        const position = positions[mode][employee.id];
+        const activity = activityById[employee.id];
+        const destination = destinations[employee.id];
+        const position = miniaturePoints[destination];
+        const moving = movingIds.includes(employee.id) && activity !== 'failed';
         const stateLabel = activity ? activityLabels[activity] : position.zone;
-        const style = { '--mini-x': `${position.x}%`, '--mini-y': `${position.y}%` } as CSSProperties;
-        return <button key={employee.id} type="button" className={`miniature-employee miniature-${employee.id}${employee.id === selectedId ? ' selected' : ''}${activity ? ` ${activity}` : ''}`} style={style} onClick={() => onSelect(employee.id)} aria-label={`${employee.name}、${employee.role}、${stateLabel}。詳細を表示`}>
+        const style = { '--mini-x': `${position.x}%`, '--mini-y': `${position.y}%`, '--mini-layer': Math.round(position.y) + 8 } as CSSProperties;
+        return <button key={employee.id} type="button" className={`miniature-employee miniature-${employee.id}${employee.id === selectedId ? ' selected' : ''}${activity ? ` ${activity}` : ''}${moving ? ' moving' : ''}`} style={style} data-destination={destination} data-state={activity ?? (moving ? 'moving' : 'idle')} onClick={() => onSelect(employee.id)} aria-label={`${employee.name}、${employee.role}、${stateLabel}。詳細を表示`}>
           {activity && <span className="miniature-activity">{activityLabels[activity]}</span>}
           <span className="miniature-avatar" aria-hidden="true"><i className="miniature-hair" /><i className="miniature-face" /><i className="miniature-body" /><i className="miniature-keyboard" /></span>
           <span className="miniature-name"><strong>{employee.name}</strong><small>{stateLabel}</small></span>

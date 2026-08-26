@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OfficeView } from './OfficeView';
 import type { OfficeMode } from '../types/office';
 import type { WorkResponse } from '../types/work';
@@ -17,6 +17,11 @@ const baseProps = {
 };
 
 describe('OfficeView', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
   it('初期表示はリアルで、切り替えるとミニチュアに5名を表示する', () => {
     render(<OfficeView {...baseProps} />);
     expect(screen.getByRole('button', { name: 'リアル' })).toHaveAttribute('aria-pressed', 'true');
@@ -43,7 +48,9 @@ describe('OfficeView', () => {
     rerender(<OfficeView {...baseProps} mode="meeting" />);
     expect(screen.getByText('ミニチュア表示・全員で企画会議中')).toBeInTheDocument();
     expect(document.querySelector('.miniature-office')).toHaveAttribute('data-mode', 'meeting');
-    expect(screen.getByRole('button', { name: /レン、マネージャー、会議席/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /レン、マネージャー、会議席/ })).toHaveAttribute('data-destination', 'meeting-ren');
+    rerender(<OfficeView {...baseProps} mode="break" />);
+    expect(screen.getByRole('button', { name: /レン、マネージャー、ラウンジ/ })).toHaveAttribute('data-destination', 'lounge-ren');
   });
 
   it('対象社員の作業中と完了を文字バッジで表示する', () => {
@@ -51,9 +58,52 @@ describe('OfficeView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ミニチュア' }));
     const sou = screen.getByRole('button', { name: /ソウ、AI開発担当、作業中/ });
     expect(within(sou).getAllByText('作業中')).toHaveLength(2);
+    expect(sou).toHaveAttribute('data-destination', 'desk-sou');
 
     const response: WorkResponse = { coordinator: 'レン', category: 'development', task: '実装確認', results: [{ employeeId: 'sou', name: 'ソウ', role: 'AI開発担当', status: 'completed', title: '成果', content: '内容' }] };
     rerender(<OfficeView {...baseProps} workStatus="success" workResponse={response} />);
     expect(within(screen.getByRole('button', { name: /ソウ、AI開発担当、完了/ })).getAllByText('完了')).toHaveLength(2);
+  });
+
+  it('業務中は決定的な巡回で一部社員だけを移動させる', () => {
+    vi.useFakeTimers();
+    render(<OfficeView {...baseProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'ミニチュア' }));
+    act(() => vi.advanceTimersByTime(1500));
+    expect(document.querySelectorAll('.miniature-employee[data-state="moving"]')).toHaveLength(0);
+    act(() => vi.advanceTimersByTime(3500));
+    const moving = document.querySelectorAll('.miniature-employee[data-state="moving"]');
+    expect(moving).toHaveLength(2);
+    expect([...moving].every((employee) => employee.hasAttribute('data-destination'))).toBe(true);
+  });
+
+  it('移動モードでは歩行状態を示し、レン依頼中は中央へ移動する', () => {
+    const { rerender } = render(<OfficeView {...baseProps} mode="walk" />);
+    fireEvent.click(screen.getByRole('button', { name: 'ミニチュア' }));
+    expect(document.querySelector('.miniature-employee.moving')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /ミオ、キャリア担当、通路/ })).toHaveAttribute('data-destination', 'aisle-center');
+    rerender(<OfficeView {...baseProps} managerStatus="loading" />);
+    expect(screen.getByRole('button', { name: /レン、マネージャー、整理中/ })).toHaveAttribute('data-destination', 'center');
+  });
+
+  it('Reduced Motionでは自律intervalを開始しない', () => {
+    vi.useFakeTimers();
+    vi.spyOn(window, 'matchMedia').mockImplementation(() => ({ matches: true, media: '(prefers-reduced-motion: reduce)', onchange: null, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn() }));
+    const intervalSpy = vi.spyOn(window, 'setInterval');
+    render(<OfficeView {...baseProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'ミニチュア' }));
+    expect(screen.getByText('移動アニメーション停止中')).toBeInTheDocument();
+    expect(intervalSpy).not.toHaveBeenCalled();
+    expect(document.querySelectorAll('.miniature-employee[data-state="moving"]')).toHaveLength(0);
+  });
+
+  it('アンマウント時に自律移動タイマーを解除する', () => {
+    vi.useFakeTimers();
+    const clearIntervalSpy = vi.spyOn(window, 'clearInterval');
+    const { unmount } = render(<OfficeView {...baseProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'ミニチュア' }));
+    unmount();
+    expect(clearIntervalSpy).toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
