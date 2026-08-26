@@ -31,7 +31,8 @@ describe('OfficeView', () => {
     expect(screen.getByRole('button', { name: 'ミニチュア' })).toHaveAttribute('aria-pressed', 'true');
     const scene = screen.getByLabelText(/ミニチュア表示・各デスクで業務中/).closest('section');
     expect(scene).not.toBeNull();
-    expect(within(scene as HTMLElement).getAllByRole('button')).toHaveLength(5);
+    expect((scene as HTMLElement).querySelectorAll('.miniature-employee')).toHaveLength(5);
+    expect(screen.getByRole('switch', { name: '自律移動 ON' })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('ミニチュアの社員選択を既存の詳細選択へ渡す', () => {
@@ -81,20 +82,57 @@ describe('OfficeView', () => {
     const { rerender } = render(<OfficeView {...baseProps} mode="walk" />);
     fireEvent.click(screen.getByRole('button', { name: 'ミニチュア' }));
     expect(document.querySelector('.miniature-employee.moving')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /ミオ、キャリア担当、通路/ })).toHaveAttribute('data-destination', 'aisle-center');
+    expect(screen.getByRole('button', { name: /ミオ、キャリア担当、通路/ })).toHaveAttribute('data-destination', 'aisle-back');
     rerender(<OfficeView {...baseProps} managerStatus="loading" />);
     expect(screen.getByRole('button', { name: /レン、マネージャー、整理中/ })).toHaveAttribute('data-destination', 'center');
   });
 
-  it('Reduced Motionでは自律intervalを開始しない', () => {
+  it('Reduced Motionでは初期状態をOFFにして自律intervalを開始しない', () => {
     vi.useFakeTimers();
     vi.spyOn(window, 'matchMedia').mockImplementation(() => ({ matches: true, media: '(prefers-reduced-motion: reduce)', onchange: null, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn() }));
     const intervalSpy = vi.spyOn(window, 'setInterval');
     render(<OfficeView {...baseProps} />);
     fireEvent.click(screen.getByRole('button', { name: 'ミニチュア' }));
-    expect(screen.getByText('移動アニメーション停止中')).toBeInTheDocument();
+    expect(screen.getByText('OS設定で移動停止中')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: '自律移動 OFF' })).toHaveAttribute('aria-checked', 'false');
     expect(intervalSpy).not.toHaveBeenCalled();
     expect(document.querySelectorAll('.miniature-employee[data-state="moving"]')).toHaveLength(0);
+  });
+
+  it('移動をアプリ内でOFFにして保存し、再表示時に復元する', () => {
+    const { unmount } = render(<OfficeView {...baseProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'ミニチュア' }));
+    fireEvent.click(screen.getByRole('switch', { name: '自律移動 ON' }));
+    expect(screen.getByText('アプリ設定で移動停止中')).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem('ai-office-miniature-motion-v1') ?? '{}')).toEqual({ version: 1, enabled: false });
+    unmount();
+    render(<OfficeView {...baseProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'ミニチュア' }));
+    expect(screen.getByRole('switch', { name: '自律移動 OFF' })).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('Reduced Motion環境でも手動ONを優先して注意を表示する', () => {
+    vi.spyOn(window, 'matchMedia').mockImplementation(() => ({ matches: true, media: '(prefers-reduced-motion: reduce)', onchange: null, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn() }));
+    render(<OfficeView {...baseProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'ミニチュア' }));
+    fireEvent.click(screen.getByRole('switch', { name: '自律移動 OFF' }));
+    expect(screen.getByRole('switch', { name: '自律移動 ON' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText('OSの動き軽減設定中ですが、手動で移動ONにしています。')).toBeInTheDocument();
+    expect(document.querySelector('.miniature-office')).toHaveClass('motion-forced');
+  });
+
+  it('顔・体・腕・足のある5名と主要オフィスエリアを表示する', () => {
+    render(<OfficeView {...baseProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'ミニチュア' }));
+    expect(document.querySelectorAll('.mini-person-face')).toHaveLength(5);
+    expect(document.querySelectorAll('.mini-person-body')).toHaveLength(5);
+    expect(document.querySelectorAll('.mini-person-arm')).toHaveLength(10);
+    expect(document.querySelectorAll('.mini-person-leg')).toHaveLength(10);
+    expect(screen.getByText('作業席')).toBeInTheDocument();
+    expect(screen.getByText('会議エリア')).toBeInTheDocument();
+    expect(screen.getByText('ラウンジ')).toBeInTheDocument();
+    expect(screen.getByText('資料棚')).toBeInTheDocument();
+    expect(screen.getAllByText('AI OFFICE').length).toBeGreaterThan(0);
   });
 
   it('アンマウント時に自律移動タイマーを解除する', () => {
