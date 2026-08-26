@@ -1,14 +1,37 @@
 # AI OFFICE
 
-AI OFFICEは、ローカルLLMを使って5名のAI社員へ仕事を依頼し、計画・成果物・人による承認・Obsidian保存までを一つの画面で扱うポートフォリオアプリです。React / TypeScript / ViteのUIと、Express / OllamaによるローカルAI処理を安全に分離して設計しています。
+AI OFFICEは、ローカルLLMを使う5名のAI社員へ仕事を依頼し、計画・成果物の生成、人による確認、Obsidian保存までを一つの画面で扱うポートフォリオアプリです。
 
-- **公開デモ（AI通信なし）**：[https://salt-417.github.io/ai-office/](https://salt-417.github.io/ai-office/)
-- **GitHub**：[https://github.com/SALT-417/ai-office](https://github.com/SALT-417/ai-office)
+**[Live Demo — AI OFFICEをブラウザで見る](https://salt-417.github.io/ai-office/)**
+
+GitHub Pages版は、API・Ollamaへ通信しない安全な`public-demo`です。固定サンプルを使って画面設計と操作フローを確認できます。
+
+[GitHub Repository](https://github.com/SALT-417/ai-office)
+
+## Key Highlights
+
+- **5 Specialized AI Employees**：計画、キャリア、開発、UI/UX、品質の固定役割で依頼を分担
+- **Local LLM Workflow**：Expressを介してOllama `qwen2.5:3b`を利用し、計画と専門成果物を生成
+- **Validated & Human-reviewed**：構造化出力をサーバーで再検証し、履歴を人が承認・差し戻し
+- **Public / Local Separation**：通信しない公開デモと、実AIを使うローカル版を明示的に分離
+- **Obsidian Integration**：確認した成果物をMarkdown化し、明示操作でローカルVaultへ保存
+
+## Tech Stack at a Glance
+
+| 領域 | 使用技術 |
+| --- | --- |
+| Frontend | React 19 / TypeScript / Vite 7 |
+| Local API | Node.js / Express / TypeScript |
+| Local AI | Ollama / `qwen2.5:3b` |
+| Quality | Vitest / React Testing Library / ESLint / TypeScript typecheck |
+| Storage & Integration | localStorage / Obsidian Markdown / GitHub Pages |
+
+## Public Demo / Local AI
 
 | 実行モード | 用途 | AI・ローカルファイル |
 | --- | --- | --- |
-| `public-demo` | GitHub Pagesで画面設計と操作を確認する固定デモ | API通信、Ollama実行、Vault保存なし |
-| `local-ai` | 自分のPCで実際にAI社員へ依頼する実働版 | Express経由でOllamaを利用。承認後のMarkdownをVaultへ保存可能 |
+| **Public Demo** (`public-demo`) | GitHub Pagesで画面設計、固定サンプル、テンプレート操作を確認 | API通信なし・Ollama実行なし・Vault保存なし |
+| **Local AI** (`local-ai`) | 自分のPCでAI社員へ実際に依頼 | Express API経由でOllamaを利用。明示操作でMarkdownをVaultへ保存可能 |
 
 ## この作品で示していること
 
@@ -113,7 +136,7 @@ Vault保存は`local-ai`限定です。ブラウザからVaultの絶対パスや
 | `OBSIDIAN_DAILY_NOTES_SUBDIR` | Vault内のDailyノート保存先 | `Daily` |
 
 ```powershell
-$env:OBSIDIAN_VAULT_DIR = "C:\Users\user\Documents\My Vault"
+$env:OBSIDIAN_VAULT_DIR = Join-Path $env:USERPROFILE "Documents\My Vault"
 $env:OBSIDIAN_EXPORT_SUBDIR = "AI OFFICE"
 $env:OBSIDIAN_DAILY_NOTES_ENABLED = "true"
 $env:OBSIDIAN_DAILY_NOTES_SUBDIR = "Daily"
