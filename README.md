@@ -20,6 +20,7 @@ AI OFFICEは、ローカルLLMを使って5名のAI社員へ仕事を依頼し�
 - **ブラウザ内データ管理**：localStorageをバージョン付きで検証し、履歴・承認状態・自分用テンプレートを復元
 - **読み取り専用分析**：許可ファイル、path、symlink、サイズ、秘密値、根拠path・line、プロンプトインジェクションを検証
 - **Obsidian連携**：YAML frontmatter付きMarkdown、手動ダウンロード、カテゴリ別Vault保存、任意のDailyノート追記
+- **Architecture Showcase**：公開デモとローカルAIの処理分岐、5名の役割、技術・安全設計・品質確認を画面内で可視化
 - **品質管理**：Vitest / React Testing Library、型チェック、ESLint、本番ビルドをGitHub Actionsでも実行
 
 ## 主な機能
@@ -138,7 +139,7 @@ npm run dev
 
 ## テストと品質確認
 
-実装時点で**247件のVitestテスト**が成功しています。
+Vitestの自動テストにより、画面・API・保存・安全境界の主要動作を継続的に確認しています。画面内のArchitecture Showcaseには、実装時点のテスト数を一つの定数から表示します。
 
 ```powershell
 npm run typecheck

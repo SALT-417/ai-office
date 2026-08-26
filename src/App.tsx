@@ -10,6 +10,7 @@ import { ProjectAnalysisSection } from './components/ProjectAnalysisSection';
 import { PublicDemoOverview } from './components/PublicDemoOverview';
 import { ObsidianStatusPanel } from './components/ObsidianStatusPanel';
 import { InAppGuide } from './components/InAppGuide';
+import { ArchitectureShowcase } from './components/ArchitectureShowcase';
 import { employeeById, employees } from './data/employees';
 import { useManagerRequest } from './hooks/useManagerRequest';
 import { usePersistentOfficeState } from './hooks/usePersistentOfficeState';
@@ -46,6 +47,7 @@ export function App({ runtimeMode = appRuntimeMode, showObsidianStatus = false }
       <ModeSwitcher activeMode={state.mode} onChange={selectMode} />
       <div className="workspace"><OfficeView mode={state.mode} selectedId={state.selectedEmployeeId} progress={overallProgress} onSelect={selectEmployee} managerStatus={managerRequest.status} assignedEmployeeIds={assignedEmployeeIds} workStatus={workRequest.status} workResponse={workRequest.response} workTargetEmployeeIds={workRequest.targetEmployeeIds} /><EmployeePanel employee={selectedEmployee} mode={state.mode} progress={state.employeeProgress[state.selectedEmployeeId]} onProgressChange={(value) => updateProgress(state.selectedEmployeeId, value)} /></div>
       <EmployeeRoster selectedId={state.selectedEmployeeId} progress={state.employeeProgress} onSelect={selectEmployee} />
+      <ArchitectureShowcase />
       <TaskRequestSection runtimeMode={runtimeMode} category={workCategory.category} categoryStorageError={workCategory.storageError} onCategoryChange={(category) => { managerRequest.reset(); workRequest.reset(); workCategory.setCategory(category); }} status={managerRequest.status} response={managerRequest.response} error={managerRequest.error} onSubmit={(task, category) => { workRequest.reset(); return managerRequest.submit(task, category); }} onSelectEmployee={selectEmployee} workStatus={workRequest.status} workResponse={workRequest.response} workError={workRequest.error} onExecute={workRequest.execute} onCancelWork={workRequest.cancel} taskToRestore={taskToRestore} />
       <ProjectAnalysisSection runtimeMode={runtimeMode} />
       {showObsidianStatus && <ObsidianStatusPanel runtimeMode={runtimeMode} />}
