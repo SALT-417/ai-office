@@ -166,6 +166,8 @@ PowerShellでVaultの既存フォルダと、Vault内の保存先サブフォル
 ```powershell
 $env:OBSIDIAN_VAULT_DIR = "C:\Users\user\Documents\My Vault"
 $env:OBSIDIAN_EXPORT_SUBDIR = "AI OFFICE"
+$env:OBSIDIAN_DAILY_NOTES_ENABLED = "true"
+$env:OBSIDIAN_DAILY_NOTES_SUBDIR = "Daily"
 npm run dev
 ```
 
@@ -178,6 +180,10 @@ npm run dev
 - `AI OFFICE/分析/20260826_060000_AI_OFFICE_analysis_aki.md`
 
 同名ファイルは各カテゴリフォルダ内で上書きせず、`-2`、`-3`の連番で保存します。保存前に秘密情報・個人情報が含まれていないか必ず確認してください。
+
+確認ダイアログで「Dailyノートにも追記する」を明示的に選ぶと、`OBSIDIAN_DAILY_NOTES_ENABLED=true`の場合だけ、ローカル日付の`Daily/YYYY-MM-DD.md`へ短いログを追記します。`OBSIDIAN_DAILY_NOTES_SUBDIR`は未指定なら`Daily`です。Dailyには日時、種別、タイトル、カテゴリ、担当、個別Markdownの相対保存先、短いメモだけを記録し、成果物全文は入れません。既存Dailyノートの内容は削除・置換せず、末尾へ追加します。
+
+Daily追記は初期状態でオフであり、個別Markdown保存のたびに利用者が選択します。サーバー設定が無効な場合やDaily追記だけが失敗した場合も、個別Markdownの保存結果は維持して画面へ状態を通知します。`public-demo`では個別保存・Daily追記とも利用できません。保存前に短いログにも秘密情報・個人情報が含まれないことを確認してください。
 
 ### GitHub Pages版について
 

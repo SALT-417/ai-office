@@ -1,4 +1,4 @@
-import { lstat, mkdir, realpath, rm, writeFile } from 'node:fs/promises';
+import { appendFile, lstat, mkdir, realpath, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { isWorkCategory, OBSIDIAN_CATEGORY_FOLDER_BY_ID } from '../shared/workCategories';
 
@@ -11,6 +11,7 @@ export interface ObsidianSaveInput {
   markdown: unknown;
   entryType?: unknown;
   category?: unknown;
+  dailyNote?: unknown;
 }
 
 export type ObsidianEntryType = 'work' | 'analysis';
@@ -19,11 +20,19 @@ export interface ObsidianSaveResult {
   saved: true;
   filename: string;
   relativePath: string;
+  dailyNote: ObsidianDailyResult;
 }
+
+export type ObsidianDailyResult =
+  | { appended: true; relativePath: string }
+  | { appended: false; reason: 'not-requested' | 'disabled' | 'failed' };
 
 export interface ObsidianSaveConfig {
   vaultDir?: string;
   exportSubdir?: string;
+  dailyNotesEnabled?: boolean;
+  dailyNotesSubdir?: string;
+  now?: () => Date;
 }
 
 export class ObsidianSaveError extends Error {
@@ -64,6 +73,44 @@ function subdirectoryParts(value: string | undefined): string[] {
   return parts;
 }
 
+function dailySubdirectoryParts(value: string | undefined): string[] {
+  const subdir = value === undefined ? 'Daily' : value.trim();
+  if (subdir.includes('/') && subdir.includes('\\')) throw new ObsidianSaveError(503, 'Dailyノート保存先の設定が正しくありません。');
+  try {
+    return subdirectoryParts(subdir);
+  } catch {
+    throw new ObsidianSaveError(503, 'Dailyノート保存先の設定が正しくありません。');
+  }
+}
+
+interface ValidDailyNote {
+  enabled: boolean;
+  title?: string;
+  summary?: string;
+  employees: string[];
+}
+
+function validateDailyNote(value: unknown): ValidDailyNote {
+  if (value === undefined) return { enabled: false, employees: [] };
+  if (typeof value !== 'object' || value === null || !('enabled' in value) || typeof value.enabled !== 'boolean') {
+    throw new ObsidianSaveError(400, 'dailyNoteの形式が正しくありません。');
+  }
+  if (!value.enabled) return { enabled: false, employees: [] };
+  const title = 'title' in value ? value.title : undefined;
+  const summary = 'summary' in value ? value.summary : undefined;
+  const employees = 'employees' in value ? value.employees : [];
+  if (typeof title !== 'string' || title.trim().length < 1 || title.trim().length > 80 || /[\r\n]/.test(title) || [...title].some((character) => character.charCodeAt(0) < 32)) {
+    throw new ObsidianSaveError(400, 'Dailyノートのタイトルは改行なしの1〜80文字で指定してください。');
+  }
+  if (typeof summary !== 'string' || summary.trim().length < 1 || summary.trim().length > 200 || /[\r\n]/.test(summary) || [...summary].some((character) => character.charCodeAt(0) < 32)) {
+    throw new ObsidianSaveError(400, 'Dailyノートのメモは改行なしの1〜200文字で指定してください。');
+  }
+  if (!Array.isArray(employees) || employees.length > 5 || !employees.every((employee) => typeof employee === 'string' && employee.trim().length >= 1 && employee.trim().length <= 20 && !/[\r\n]/.test(employee))) {
+    throw new ObsidianSaveError(400, 'Dailyノートの担当者が正しくありません。');
+  }
+  return { enabled: true, title: title.trim(), summary: summary.trim(), employees: employees.map((employee) => employee.trim()) };
+}
+
 function entrySubdirectory(input: ObsidianSaveInput): string[] {
   if (input.entryType === undefined) return [];
   if (input.entryType === 'analysis') return ['分析'];
@@ -97,9 +144,61 @@ function numberedFilename(filename: string, number: number): string {
   return `${filename.slice(0, -extension.length)}-${number}${extension}`;
 }
 
+function localDateParts(date: Date): { date: string; time: string } {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hour = String(date.getHours()).padStart(2, '0');
+  const minute = String(date.getMinutes()).padStart(2, '0');
+  return { date: `${year}-${month}-${day}`, time: `${hour}:${minute}` };
+}
+
+function escapeDailyInline(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/([\\`*_{}[\]()#+.!|~-])/g, '\\$1');
+}
+
+async function appendDailyNote(vaultRoot: string, input: ObsidianSaveInput, savedRelativePath: string, daily: ValidDailyNote, config: ObsidianSaveConfig): Promise<ObsidianDailyResult> {
+  if (!daily.enabled) return { appended: false, reason: 'not-requested' };
+  if (!config.dailyNotesEnabled) return { appended: false, reason: 'disabled' };
+  try {
+    const parts = dailySubdirectoryParts(config.dailyNotesSubdir);
+    const directory = await safeExportDirectory(vaultRoot, parts);
+    const timestamp = localDateParts(config.now?.() ?? new Date());
+    const filename = `${timestamp.date}.md`;
+    const target = path.join(directory, filename);
+    if (!isInside(vaultRoot, target) || path.dirname(target) !== directory) throw new Error('Unsafe daily target');
+    try {
+      const info = await lstat(target);
+      if (info.isSymbolicLink() || !info.isFile()) throw new Error('Unsafe daily file');
+      const existingPath = await realpath(target);
+      if (!isInside(vaultRoot, existingPath) || path.dirname(existingPath) !== directory) throw new Error('Unsafe daily file');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    const typeLabel = input.entryType === 'analysis' ? '分析履歴' : '作業履歴';
+    const categoryLabel = input.entryType === 'analysis'
+      ? '分析'
+      : isWorkCategory(input.category) ? OBSIDIAN_CATEGORY_FOLDER_BY_ID[input.category] : '未指定';
+    const employeeLabel = daily.employees.length ? daily.employees.map(escapeDailyInline).join('・') : '未指定';
+    const log = `\n\n## AI OFFICE\n\n- ${timestamp.time} ${typeLabel}: ${escapeDailyInline(daily.title ?? '')}\n  - カテゴリ: ${categoryLabel}\n  - 担当: ${employeeLabel}\n  - 保存先: ${escapeDailyInline(savedRelativePath)}\n  - メモ: ${escapeDailyInline(daily.summary ?? '')}\n`;
+    await appendFile(target, log, { encoding: 'utf8' });
+    const savedPath = await realpath(target);
+    if (!isInside(vaultRoot, savedPath) || path.dirname(savedPath) !== directory) throw new Error('Unsafe saved daily file');
+    return { appended: true, relativePath: [...parts, filename].join('/') };
+  } catch {
+    return { appended: false, reason: 'failed' };
+  }
+}
+
 export async function saveObsidianMarkdown(input: ObsidianSaveInput, config: ObsidianSaveConfig = {}): Promise<ObsidianSaveResult> {
   const filename = validateFilename(input.filename);
   const markdown = validateMarkdown(input.markdown);
+  const daily = validateDailyNote(input.dailyNote);
+  if (daily.enabled && config.dailyNotesEnabled) dailySubdirectoryParts(config.dailyNotesSubdir);
   const vaultDir = config.vaultDir?.trim();
   if (!vaultDir) throw new ObsidianSaveError(503, 'Obsidian Vaultの保存先が設定されていません。');
 
@@ -132,7 +231,9 @@ export async function saveObsidianMarkdown(input: ObsidianSaveInput, config: Obs
         await rm(candidate, { force: true });
         throw new ObsidianSaveError(503, '保存先の安全確認に失敗しました。');
       }
-      return { saved: true, filename: candidateName, relativePath: [...parts, candidateName].join('/') };
+      const relativePath = [...parts, candidateName].join('/');
+      const dailyNote = await appendDailyNote(vaultRoot, input, relativePath, daily, config);
+      return { saved: true, filename: candidateName, relativePath, dailyNote };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'EEXIST') continue;
       if (error instanceof ObsidianSaveError) throw error;
@@ -143,5 +244,10 @@ export async function saveObsidianMarkdown(input: ObsidianSaveInput, config: Obs
 }
 
 export function getObsidianSaveConfig(environment: NodeJS.ProcessEnv = process.env): ObsidianSaveConfig {
-  return { vaultDir: environment.OBSIDIAN_VAULT_DIR, exportSubdir: environment.OBSIDIAN_EXPORT_SUBDIR };
+  return {
+    vaultDir: environment.OBSIDIAN_VAULT_DIR,
+    exportSubdir: environment.OBSIDIAN_EXPORT_SUBDIR,
+    dailyNotesEnabled: environment.OBSIDIAN_DAILY_NOTES_ENABLED?.trim().toLowerCase() === 'true',
+    dailyNotesSubdir: environment.OBSIDIAN_DAILY_NOTES_SUBDIR,
+  };
 }

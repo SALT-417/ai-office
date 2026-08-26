@@ -87,7 +87,7 @@ describe('ProjectAnalysisSection', () => {
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ saved: true, filename: 'analysis.md', relativePath: 'AI OFFICE/analysis.md' }), { status: 200 }));
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ saved: true, filename: 'analysis.md', relativePath: 'AI OFFICE/analysis.md', dailyNote: { appended: false, reason: 'not-requested' } }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     render(<ProjectAnalysisSection isStaticDemo={false} runtimeMode="local-ai" />);
     await user.click(screen.getByRole('button', { name: 'Markdownをコピー' }));

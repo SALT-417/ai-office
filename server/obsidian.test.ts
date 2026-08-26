@@ -41,8 +41,8 @@ describe('Obsidian Vault save safety', () => {
     const vaultDir = await temporaryDirectory('ai-office-vault-');
     const first = await saveObsidianMarkdown({ filename: 'note.md', markdown: '# first' }, { vaultDir, exportSubdir: 'AI OFFICE' });
     const second = await saveObsidianMarkdown({ filename: 'note.md', markdown: '# second' }, { vaultDir, exportSubdir: 'AI OFFICE' });
-    expect(first).toEqual({ saved: true, filename: 'note.md', relativePath: 'AI OFFICE/note.md' });
-    expect(second).toEqual({ saved: true, filename: 'note-2.md', relativePath: 'AI OFFICE/note-2.md' });
+    expect(first).toEqual({ saved: true, filename: 'note.md', relativePath: 'AI OFFICE/note.md', dailyNote: { appended: false, reason: 'not-requested' } });
+    expect(second).toEqual({ saved: true, filename: 'note-2.md', relativePath: 'AI OFFICE/note-2.md', dailyNote: { appended: false, reason: 'not-requested' } });
     expect(await readFile(path.join(vaultDir, 'AI OFFICE', 'note.md'), 'utf8')).toBe('# first');
     expect(await readFile(path.join(vaultDir, 'AI OFFICE', 'note-2.md'), 'utf8')).toBe('# second');
   });
@@ -95,5 +95,74 @@ describe('Obsidian Vault save safety', () => {
     const saved = await saveObsidianMarkdown({ filename: 'note.md', markdown: 'new' }, { vaultDir });
     expect(saved.filename).toBe('note-2.md');
     expect(await readFile(path.join(vaultDir, 'AI OFFICE', 'note.md'), 'utf8')).toBe('keep');
+  });
+
+  it('keeps the individual save successful when Daily notes are disabled', async () => {
+    const vaultDir = await temporaryDirectory('ai-office-vault-');
+    const saved = await saveObsidianMarkdown({ filename: 'work.md', markdown: '# full body', entryType: 'work', category: 'development', dailyNote: { enabled: true, title: 'API改善', summary: '承認済み成果物を保存しました。', employees: ['ソウ'] } }, { vaultDir, dailyNotesEnabled: false });
+    expect(saved.dailyNote).toEqual({ appended: false, reason: 'disabled' });
+    expect(await readFile(path.join(vaultDir, 'AI OFFICE', '開発', 'work.md'), 'utf8')).toBe('# full body');
+  });
+
+  it('creates and appends a short UTF-8 Daily log while preserving existing content', async () => {
+    const vaultDir = await temporaryDirectory('ai-office-vault-');
+    await mkdir(path.join(vaultDir, 'Daily'));
+    const dailyPath = path.join(vaultDir, 'Daily', '2026-08-26.md');
+    await writeFile(dailyPath, '# 既存ノート\n', 'utf8');
+    const input = { filename: 'work.md', markdown: '# 個別Markdown全文はDailyへ入れない', entryType: 'work', category: 'development', dailyNote: { enabled: true, title: 'API改善', summary: '承認済み成果物を保存しました。', employees: ['ソウ'] } };
+    const config = { vaultDir, dailyNotesEnabled: true, dailyNotesSubdir: 'Daily', now: () => new Date(2026, 7, 26, 10, 35) };
+    const first = await saveObsidianMarkdown(input, config);
+    const second = await saveObsidianMarkdown(input, config);
+    const daily = await readFile(dailyPath, 'utf8');
+    expect(first.dailyNote).toEqual({ appended: true, relativePath: 'Daily/2026-08-26.md' });
+    expect(second.dailyNote).toEqual({ appended: true, relativePath: 'Daily/2026-08-26.md' });
+    expect(daily).toContain('# 既存ノート');
+    expect(daily.match(/10:35 作業履歴/g)).toHaveLength(2);
+    expect(daily).toContain('カテゴリ: 開発');
+    expect(daily).toContain('担当: ソウ');
+    expect(daily).toContain('保存先: AI OFFICE/開発/work');
+    expect(daily).toContain('メモ: 承認済み成果物を保存しました');
+    expect(daily).not.toContain('個別Markdown全文はDailyへ入れない');
+  });
+
+  it('creates an analysis Daily note without exposing absolute paths', async () => {
+    const vaultDir = await temporaryDirectory('ai-office-vault-');
+    const saved = await saveObsidianMarkdown({ filename: 'analysis.md', markdown: '# analysis', entryType: 'analysis', dailyNote: { enabled: true, title: '入力検証の分析', summary: '承認済み分析を保存しました。', employees: ['アキ'] } }, { vaultDir, dailyNotesEnabled: true, now: () => new Date(2026, 7, 26, 11, 5) });
+    expect(saved.dailyNote).toEqual({ appended: true, relativePath: 'Daily/2026-08-26.md' });
+    expect(JSON.stringify(saved)).not.toContain(vaultDir);
+    expect(await readFile(path.join(vaultDir, 'Daily', '2026-08-26.md'), 'utf8')).toContain('11:05 分析履歴');
+  });
+
+  it('escapes HTML and Markdown syntax in Daily metadata as inert text', async () => {
+    const vaultDir = await temporaryDirectory('ai-office-vault-');
+    await saveObsidianMarkdown({ filename: 'work.md', markdown: '# work', entryType: 'work', category: 'general', dailyNote: { enabled: true, title: '<script>*確認*</script>', summary: '[リンク](javascript:alert(1))', employees: ['ソウ'] } }, { vaultDir, dailyNotesEnabled: true, now: () => new Date(2026, 7, 26, 12, 0) });
+    const daily = await readFile(path.join(vaultDir, 'Daily', '2026-08-26.md'), 'utf8');
+    expect(daily).toContain('&lt;script&gt;\\*確認\\*&lt;/script&gt;');
+    expect(daily).toContain('\\[リンク\\]\\(javascript:alert\\(1\\)\\)');
+    expect(daily).not.toContain('<script>');
+  });
+
+  it.each([
+    [{ enabled: true, title: '', summary: 'メモ', employees: [] }],
+    [{ enabled: true, title: 'a'.repeat(81), summary: 'メモ', employees: [] }],
+    [{ enabled: true, title: '題名', summary: 'a'.repeat(201), employees: [] }],
+    [{ enabled: true, title: '題名\n改行', summary: 'メモ', employees: [] }],
+  ])('rejects invalid Daily metadata before writing an individual file', async (dailyNote) => {
+    const vaultDir = await temporaryDirectory('ai-office-vault-');
+    await expect(saveObsidianMarkdown({ filename: 'work.md', markdown: '# work', entryType: 'work', category: 'general', dailyNote }, { vaultDir, dailyNotesEnabled: true })).rejects.toMatchObject({ status: 400 });
+    await expect(readFile(path.join(vaultDir, 'AI OFFICE', '一般業務', 'work.md'), 'utf8')).rejects.toBeTruthy();
+  });
+
+  it.each(['../Daily', 'C:\\Daily', 'Daily\\mixed/path', 'bad:name', 'bad\0name'])('rejects an unsafe Daily subdirectory setting: %s', async (dailyNotesSubdir) => {
+    const vaultDir = await temporaryDirectory('ai-office-vault-');
+    await expect(saveObsidianMarkdown({ filename: 'work.md', markdown: '# work', entryType: 'work', category: 'general', dailyNote: { enabled: true, title: '題名', summary: 'メモ', employees: [] } }, { vaultDir, dailyNotesEnabled: true, dailyNotesSubdir })).rejects.toMatchObject({ status: 503 });
+  });
+
+  it('keeps the individual save when only Daily append fails', async () => {
+    const vaultDir = await temporaryDirectory('ai-office-vault-');
+    await writeFile(path.join(vaultDir, 'Daily'), 'not a directory');
+    const saved = await saveObsidianMarkdown({ filename: 'work.md', markdown: '# work', entryType: 'work', category: 'general', dailyNote: { enabled: true, title: '題名', summary: 'メモ', employees: [] } }, { vaultDir, dailyNotesEnabled: true });
+    expect(saved.dailyNote).toEqual({ appended: false, reason: 'failed' });
+    expect(await readFile(path.join(vaultDir, 'AI OFFICE', '一般業務', 'work.md'), 'utf8')).toBe('# work');
   });
 });

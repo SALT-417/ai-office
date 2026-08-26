@@ -141,7 +141,7 @@ describe('work history integration', () => {
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ saved: true, filename: 'work.md', relativePath: 'AI OFFICE/work.md' }), { status: 200 }));
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ saved: true, filename: 'work.md', relativePath: 'AI OFFICE/work.md', dailyNote: { appended: false, reason: 'not-requested' } }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     render(<App />);
     await user.click(screen.getByRole('button', { name: 'Markdownをコピー' }));

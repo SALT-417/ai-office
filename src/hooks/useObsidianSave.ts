@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ObsidianEntryType, ObsidianSaveResponse, ObsidianSaveStatus } from '../types/obsidian';
+import type { ObsidianDailyNoteRequest, ObsidianEntryType, ObsidianSaveResponse, ObsidianSaveStatus } from '../types/obsidian';
 import type { WorkCategory } from '../../shared/workCategories';
 import type { AppRuntimeMode } from '../utils/runtimeMode';
 
@@ -15,6 +15,11 @@ function safeError(value: unknown): string {
 function isSaveResponse(value: unknown): value is ObsidianSaveResponse {
   if (typeof value !== 'object' || value === null) return false;
   const response = value as Partial<ObsidianSaveResponse>;
+  const daily = response.dailyNote;
+  const validDaily = typeof daily === 'object' && daily !== null && 'appended' in daily && (
+    (daily.appended === true && 'relativePath' in daily && typeof daily.relativePath === 'string' && daily.relativePath.length > 0 && daily.relativePath.length <= 300 && !daily.relativePath.includes('..') && !daily.relativePath.includes('\\'))
+    || (daily.appended === false && 'reason' in daily && (daily.reason === 'not-requested' || daily.reason === 'disabled' || daily.reason === 'failed'))
+  );
   return response.saved === true
     && typeof response.filename === 'string'
     && response.filename.endsWith('.md')
@@ -23,7 +28,8 @@ function isSaveResponse(value: unknown): value is ObsidianSaveResponse {
     && response.relativePath.length > 0
     && response.relativePath.length <= 300
     && !response.relativePath.includes('..')
-    && !response.relativePath.includes('\\');
+    && !response.relativePath.includes('\\')
+    && validDaily;
 }
 
 export function useObsidianSave(runtimeMode: AppRuntimeMode) {
@@ -38,7 +44,7 @@ export function useObsidianSave(runtimeMode: AppRuntimeMode) {
     return () => { mountedRef.current = false; controllerRef.current?.abort(); };
   }, []);
 
-  const save = async (filename: string, markdown: string, entryType: ObsidianEntryType, category?: WorkCategory) => {
+  const save = async (filename: string, markdown: string, entryType: ObsidianEntryType, category: WorkCategory | undefined, dailyNote: ObsidianDailyNoteRequest) => {
     if (runtimeMode !== 'local-ai' || inFlightRef.current) return;
     inFlightRef.current = true;
     controllerRef.current?.abort();
@@ -51,7 +57,7 @@ export function useObsidianSave(runtimeMode: AppRuntimeMode) {
       const response = await fetch('/api/obsidian/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename, markdown, entryType, ...(entryType === 'work' ? { category } : {}) }),
+        body: JSON.stringify({ filename, markdown, entryType, ...(entryType === 'work' ? { category } : {}), dailyNote }),
         signal: controller.signal,
       });
       const body: unknown = await response.json().catch(() => null);
@@ -59,7 +65,14 @@ export function useObsidianSave(runtimeMode: AppRuntimeMode) {
       if (!isSaveResponse(body)) throw new Error(GENERIC_ERROR);
       if (mountedRef.current && controllerRef.current === controller) {
         setStatus('success');
-        setMessage(`Obsidian用Markdownを保存しました: ${body.relativePath}`);
+        const dailyMessage = body.dailyNote.appended
+          ? `。Dailyにも追記しました: ${body.dailyNote.relativePath}`
+          : body.dailyNote.reason === 'disabled'
+            ? '。Daily追記は設定で無効です。'
+            : body.dailyNote.reason === 'failed'
+              ? '。Markdownは保存しましたが、Daily追記は失敗しました。'
+              : '';
+        setMessage(`Obsidian用Markdownを保存しました: ${body.relativePath}${dailyMessage}`);
       }
     } catch (error) {
       if (!mountedRef.current || controllerRef.current !== controller) return;

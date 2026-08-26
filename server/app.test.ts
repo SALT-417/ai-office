@@ -168,12 +168,12 @@ describe('POST /api/obsidian/save', () => {
   }
 
   it('passes only filename and Markdown and returns relative save information', async () => {
-    const obsidianSave = vi.fn().mockResolvedValue({ saved: true as const, filename: 'note.md', relativePath: 'AI OFFICE/note.md' });
+    const obsidianSave = vi.fn().mockResolvedValue({ saved: true as const, filename: 'note.md', relativePath: 'AI OFFICE/note.md', dailyNote: { appended: false as const, reason: 'not-requested' as const } });
     const url = await startObsidianApi(obsidianSave);
     const response = await post(url, { filename: 'note.md', markdown: '# note', vaultPath: 'C:\\private' });
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ saved: true, filename: 'note.md', relativePath: 'AI OFFICE/note.md' });
-    expect(obsidianSave).toHaveBeenCalledWith({ filename: 'note.md', markdown: '# note', entryType: undefined, category: undefined }, { vaultDir: 'server-only', exportSubdir: 'AI OFFICE' });
+    await expect(response.json()).resolves.toEqual({ saved: true, filename: 'note.md', relativePath: 'AI OFFICE/note.md', dailyNote: { appended: false, reason: 'not-requested' } });
+    expect(obsidianSave).toHaveBeenCalledWith({ filename: 'note.md', markdown: '# note', entryType: undefined, category: undefined, dailyNote: undefined }, { vaultDir: 'server-only', exportSubdir: 'AI OFFICE' });
   });
 
   it('returns safe public errors without absolute paths or stacks', async () => {

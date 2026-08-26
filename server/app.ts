@@ -124,7 +124,7 @@ export function createApp(dependencies: AppDependencies = {}) {
 
   app.post('/api/obsidian/save', async (request, response) => {
     try {
-      response.json(await obsidianSave({ filename: request.body?.filename, markdown: request.body?.markdown, entryType: request.body?.entryType, category: request.body?.category }, obsidianConfig));
+      response.json(await obsidianSave({ filename: request.body?.filename, markdown: request.body?.markdown, entryType: request.body?.entryType, category: request.body?.category, dailyNote: request.body?.dailyNote }, obsidianConfig));
     } catch (error) {
       if (error instanceof ObsidianSaveError) {
         response.status(error.status).json({ error: error.publicMessage });
