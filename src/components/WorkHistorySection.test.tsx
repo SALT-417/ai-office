@@ -131,6 +131,25 @@ describe('work history integration', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('コピーできませんでした');
   });
 
+  it('copies and downloads the selected work history as Markdown', async () => {
+    const user = userEvent.setup();
+    seed([historyEntry()]);
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const createObjectURL = vi.fn(() => 'blob:work-markdown');
+    const revokeObjectURL = vi.fn();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: 'Markdownをコピー' }));
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('type: "work-history"'));
+    await user.click(screen.getByRole('button', { name: '.mdをダウンロード' }));
+    expect(click).toHaveBeenCalledOnce();
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:work-markdown'));
+    expect(await screen.findByRole('status')).toHaveTextContent('ダウンロードしました');
+  });
+
   it('keeps the current result visible and reports storage quota errors', async () => {
     const user = userEvent.setup();
     vi.stubGlobal('fetch', mockAi());

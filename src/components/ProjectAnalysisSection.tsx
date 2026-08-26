@@ -5,6 +5,7 @@ import type { AnalysisFinding, AnalysisHistoryEntry, AnalysisResponse, AnalysisS
 import type { ReviewStatus } from '../types/history';
 import { PUBLIC_DEMO_NOTICE, publicDemoAnalysis } from '../data/publicDemo';
 import type { AppRuntimeMode } from '../utils/runtimeMode';
+import { analysisHistoryToMarkdown, createMarkdownFilename, downloadMarkdown } from '../utils/markdownExport';
 
 const categories: Array<[ProjectFileCategory, string]> = [['frontend', 'フロントエンド'], ['server', 'サーバー'], ['test', 'テスト'], ['config', '設定'], ['documentation', 'ドキュメント']];
 const severityLabels = { low: '低', medium: '中', high: '高' } as const;
@@ -39,12 +40,22 @@ function AnalysisHistory({ history }: { history: ReturnType<typeof useAnalysisHi
     try { await navigator.clipboard.writeText(content); setCopyStatus('分析結果をコピーしました。'); }
     catch { setCopyStatus('コピーできませんでした。ブラウザの権限を確認してください。'); }
   };
+  const copyMarkdown = async () => {
+    if (!selected) return;
+    try { await navigator.clipboard.writeText(analysisHistoryToMarkdown(selected)); setCopyStatus('Markdownをコピーしました。'); }
+    catch { setCopyStatus('Markdownをコピーできませんでした。ブラウザの権限を確認してください。'); }
+  };
+  const exportMarkdown = () => {
+    if (!selected) return;
+    downloadMarkdown(analysisHistoryToMarkdown(selected), createMarkdownFilename(selected));
+    setCopyStatus('Markdownファイルをダウンロードしました。');
+  };
   return <div className="analysis-history"><div className="analysis-subheading"><h3>分析履歴</h3><p>このブラウザ内だけに保存され、既存の作業履歴とは別に管理されます。</p></div>
     {history.storageError && <p role="alert" className="request-error">{history.storageError}</p>}{copyStatus && <p role="status" className="history-copy-status">{copyStatus}</p>}
     {history.entries.length === 0 ? <div className="history-empty"><span aria-hidden="true">⌕</span><h4>分析履歴はまだありません</h4><p>読み取り専用分析が完了すると自動保存されます。</p></div> : <div className="analysis-history-layout">
       <div className="history-list" aria-label="分析履歴一覧">{history.entries.map((entry) => <button type="button" className={`history-list-item ${history.selectedId === entry.id ? 'active' : ''}`} key={entry.id} onClick={() => history.select(entry.id)}><strong>{entry.objective}</strong><small>{formatDate(entry.createdAt)} · {entry.specialistName}</small><span className={`review-badge ${entry.reviewStatus}`}>{reviewLabels[entry.reviewStatus]}</span></button>)}</div>
       {selected && <div className="history-detail"><div className="history-detail-heading"><div><p className="eyebrow">READ-ONLY ANALYSIS</p><h3>{selected.objective}</h3></div><button type="button" className="history-delete-one" onClick={() => setDeleteTarget(selected)}>この分析を削除</button></div>
-        <dl className="history-meta"><div><dt>対象</dt><dd>{selected.analyzedFiles.join('、')}</dd></div><div><dt>更新</dt><dd>{formatDate(selected.updatedAt)}</dd></div></dl><button type="button" className="copy-button" onClick={() => void copy()}>分析結果をコピー</button><Findings response={selected} />
+        <dl className="history-meta"><div><dt>対象</dt><dd>{selected.analyzedFiles.join('、')}</dd></div><div><dt>更新</dt><dd>{formatDate(selected.updatedAt)}</dd></div></dl><button type="button" className="copy-button" onClick={() => void copy()}>分析結果をコピー</button><div className="markdown-export"><div><button type="button" className="copy-button" onClick={() => void copyMarkdown()}>Markdownをコピー</button><button type="button" className="copy-button" onClick={exportMarkdown}>.mdをダウンロード</button></div><p>Obsidianへ自動保存はしません。秘密情報や個人情報がないか、出力内容を確認してから利用してください。</p></div><Findings response={selected} />
         <div className="history-review"><div className="review-heading"><h4>人による確認</h4><span className={`review-badge ${selected.reviewStatus}`}>{reviewLabels[selected.reviewStatus]}</span></div><label htmlFor="analysis-review-note">確認メモ（任意）</label><textarea id="analysis-review-note" maxLength={1000} value={note} onChange={(event) => setNote(event.target.value)} rows={3} /><div className="review-actions"><button className="approve-button" type="button" onClick={() => review('approved')}>✓ 承認する</button><button className="reject-button" type="button" onClick={() => review('rejected')}>↩ 差し戻す</button></div><p>承認は状態の記録だけで、ファイル変更やコマンド実行は行いません。</p></div>
       </div>}
     </div>}

@@ -75,4 +75,26 @@ describe('ProjectAnalysisSection', () => {
     await user.click(screen.getByRole('button', { name: 'この分析を削除' })); expect(screen.getByRole('dialog')).toBeInTheDocument(); await user.click(screen.getByRole('button', { name: 'キャンセル' })); expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'この分析を削除' })); await user.click(screen.getByRole('button', { name: '削除する' })); expect(screen.getByText('分析履歴はまだありません')).toBeInTheDocument(); expect(localStorage.getItem('ai-office-work-history-v1')).toBe('keep');
   });
+
+  it('copies and downloads analysis history as Markdown and reports copy failure', async () => {
+    const saved = { ...result, id: 'saved', createdAt: '2026-08-25T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z', reviewStatus: 'pending', reviewNote: '' };
+    localStorage.setItem('ai-office-analysis-history-v1', JSON.stringify({ version: 1, entries: [saved] }));
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const createObjectURL = vi.fn(() => 'blob:analysis-markdown');
+    const revokeObjectURL = vi.fn();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
+    render(<ProjectAnalysisSection isStaticDemo />);
+    await user.click(screen.getByRole('button', { name: 'Markdownをコピー' }));
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('type: "analysis-history"'));
+    await user.click(screen.getByRole('button', { name: '.mdをダウンロード' }));
+    expect(click).toHaveBeenCalledOnce();
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:analysis-markdown'));
+    writeText.mockRejectedValueOnce(new Error('denied'));
+    await user.click(screen.getByRole('button', { name: 'Markdownをコピー' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('コピーできませんでした');
+  });
 });
