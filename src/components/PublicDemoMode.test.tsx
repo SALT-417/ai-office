@@ -12,8 +12,10 @@ describe('public sample mode', () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     render(<App runtimeMode="public-demo" />);
-    expect(screen.getAllByText('公開サンプル・AI通信なし').length).toBeGreaterThan(0);
+    expect(screen.getByText('公開デモ・安全な固定例')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'この作品で示していること' })).toBeInTheDocument();
+    expect(screen.getByText('Safe Simulation')).toBeInTheDocument();
+    expect(screen.getByText('Ollama Enabled')).toBeInTheDocument();
 
     localStorage.setItem('ai-office-work-history-v1', 'keep-work');
     localStorage.setItem('ai-office-analysis-history-v1', 'keep-analysis');
@@ -42,7 +44,7 @@ describe('public sample mode', () => {
 
   it('keeps the local mode label and existing request UI', () => {
     render(<App runtimeMode="local-ai" />);
-    expect(screen.getAllByText('ローカルAI稼働').length).toBeGreaterThan(0);
+    expect(screen.getByText('ローカルAI・Ollama稼働')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'レンに依頼する' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'サンプル計画を見る' })).not.toBeInTheDocument();
   });

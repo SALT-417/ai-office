@@ -6,7 +6,7 @@ describe('InAppGuide', () => {
   it('explains the safe public demo and its available operations', async () => {
     const user = userEvent.setup();
     render(<InAppGuide runtimeMode="public-demo" />);
-    expect(screen.getByText(/公開サンプル・AI通信なし/)).toBeInTheDocument();
+    expect(screen.getByText(/カテゴリと固定サンプルを操作/)).toBeInTheDocument();
     const toggle = screen.getByRole('button', { name: /ガイドを開く/ });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await user.click(toggle);
@@ -20,7 +20,7 @@ describe('InAppGuide', () => {
   it('shows the local workflow and Obsidian environment settings', async () => {
     const user = userEvent.setup();
     render(<InAppGuide runtimeMode="local-ai" />);
-    expect(screen.getByText(/OllamaとExpressを使って5名のAI社員へ依頼/)).toBeInTheDocument();
+    expect(screen.getByText(/Ollamaで5名のAI社員へ依頼/)).toBeInTheDocument();
     const toggle = screen.getByRole('button', { name: /ガイドを開く/ });
     toggle.focus();
     await user.keyboard('{Enter}');

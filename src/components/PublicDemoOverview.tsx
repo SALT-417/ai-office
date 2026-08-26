@@ -1,7 +1,7 @@
 export function PublicDemoOverview() {
   return <section className="public-demo-overview" aria-labelledby="public-demo-overview-title">
-    <p className="eyebrow">PORTFOLIO ARCHITECTURE</p><h2 id="public-demo-overview-title">この作品で示していること</h2>
-    <p>一般業務・AI学習・開発・転職・コンテンツの5カテゴリを切り替え、同じ5名が基本役割を保ちながら仕事を分担します。公開版は固定サンプル、ローカル版はOllamaによる実働です。</p>
-    <ul><li><strong>カテゴリ切替型AI：</strong>選択カテゴリと依頼文をサーバーで検証し、別用途へ勝手に置き換えない役割分担を行います。</li><li><strong>安全に失敗：</strong>構造化出力を検証し、失敗分離・タイムアウト・キャンセルで画面と処理を停止させません。</li><li><strong>読み取り専用分析：</strong>パス、秘密情報、プロンプトインジェクションを検査し、選択ファイルだけを根拠にします。</li><li><strong>人が最終判断：</strong>結果は提案として履歴化し、承認してもファイル変更や外部送信を行いません。自動テストで主要な境界を確認します。</li></ul>
+    <div className="public-demo-summary"><div><p className="eyebrow">PORTFOLIO ARCHITECTURE</p><h2 id="public-demo-overview-title">この作品で示していること</h2></div><p>5名のAI社員が、依頼から成果物・確認までを役割分担するローカルAIワークフローです。</p></div>
+    <ul><li><strong>UI</strong><span>Reactで業務体験を可視化</span></li><li><strong>AI活用</strong><span>役割分担と構造化出力</span></li><li><strong>安全設計</strong><span>検証・中断・失敗分離</span></li><li><strong>人の確認</strong><span>履歴・承認・再利用</span></li></ul>
+    <div className="runtime-comparison" aria-label="公開版とローカル版の違い"><span><strong>Public Demo</strong>Safe Simulation</span><span><strong>Local AI</strong>Ollama Enabled</span><small>公開版は固定例で安全に操作でき、ローカル環境ではOllamaによる実AI処理を利用できます。</small></div>
   </section>;
 }

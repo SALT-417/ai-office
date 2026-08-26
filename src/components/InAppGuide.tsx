@@ -6,7 +6,7 @@ export function InAppGuide({ runtimeMode }: { runtimeMode: AppRuntimeMode }) {
   const isPublic = runtimeMode === 'public-demo';
   return <section className="in-app-guide" aria-labelledby="in-app-guide-title">
     <div className="in-app-guide-heading">
-      <div><p className="eyebrow">QUICK START</p><h2 id="in-app-guide-title">使い方ガイド</h2><p>{isPublic ? '公開サンプル・AI通信なし。安全な固定例で操作と設計を確認できます。' : 'ローカルAI稼働。OllamaとExpressを使って5名のAI社員へ依頼できます。'}</p></div>
+      <div><p className="eyebrow">QUICK START</p><h2 id="in-app-guide-title">使い方ガイド</h2><p>{isPublic ? 'カテゴリと固定サンプルを操作し、実働版の設計を確認できます。' : 'カテゴリを選び、Ollamaで5名のAI社員へ依頼できます。'}</p></div>
       <button type="button" aria-expanded={open} aria-controls="in-app-guide-content" onClick={() => setOpen((current) => !current)}>{open ? 'ガイドを閉じる' : 'ガイドを開く'}<span aria-hidden="true">{open ? '−' : '＋'}</span></button>
     </div>
     {open && <div id="in-app-guide-content" className="in-app-guide-content">
