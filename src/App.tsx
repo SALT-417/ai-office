@@ -3,7 +3,7 @@ import { AppHeader } from './components/AppHeader';
 import { EmployeePanel } from './components/EmployeePanel';
 import { EmployeeRoster } from './components/EmployeeRoster';
 import { ModeSwitcher } from './components/ModeSwitcher';
-import { OfficeScene } from './components/OfficeScene';
+import { OfficeView } from './components/OfficeView';
 import { TaskRequestSection } from './components/TaskRequestSection';
 import { WorkHistorySection } from './components/WorkHistorySection';
 import { ProjectAnalysisSection } from './components/ProjectAnalysisSection';
@@ -44,7 +44,7 @@ export function App({ runtimeMode = appRuntimeMode, showObsidianStatus = false }
       {runtimeMode === 'public-demo' && <PublicDemoOverview />}
       <InAppGuide runtimeMode={runtimeMode} />
       <ModeSwitcher activeMode={state.mode} onChange={selectMode} />
-      <div className="workspace"><OfficeScene mode={state.mode} selectedId={state.selectedEmployeeId} progress={overallProgress} onSelect={selectEmployee} managerStatus={managerRequest.status} assignedEmployeeIds={assignedEmployeeIds} workStatus={workRequest.status} workResponse={workRequest.response} workTargetEmployeeIds={workRequest.targetEmployeeIds} /><EmployeePanel employee={selectedEmployee} mode={state.mode} progress={state.employeeProgress[state.selectedEmployeeId]} onProgressChange={(value) => updateProgress(state.selectedEmployeeId, value)} /></div>
+      <div className="workspace"><OfficeView mode={state.mode} selectedId={state.selectedEmployeeId} progress={overallProgress} onSelect={selectEmployee} managerStatus={managerRequest.status} assignedEmployeeIds={assignedEmployeeIds} workStatus={workRequest.status} workResponse={workRequest.response} workTargetEmployeeIds={workRequest.targetEmployeeIds} /><EmployeePanel employee={selectedEmployee} mode={state.mode} progress={state.employeeProgress[state.selectedEmployeeId]} onProgressChange={(value) => updateProgress(state.selectedEmployeeId, value)} /></div>
       <EmployeeRoster selectedId={state.selectedEmployeeId} progress={state.employeeProgress} onSelect={selectEmployee} />
       <TaskRequestSection runtimeMode={runtimeMode} category={workCategory.category} categoryStorageError={workCategory.storageError} onCategoryChange={(category) => { managerRequest.reset(); workRequest.reset(); workCategory.setCategory(category); }} status={managerRequest.status} response={managerRequest.response} error={managerRequest.error} onSubmit={(task, category) => { workRequest.reset(); return managerRequest.submit(task, category); }} onSelectEmployee={selectEmployee} workStatus={workRequest.status} workResponse={workRequest.response} workError={workRequest.error} onExecute={workRequest.execute} onCancelWork={workRequest.cancel} taskToRestore={taskToRestore} />
       <ProjectAnalysisSection runtimeMode={runtimeMode} />
