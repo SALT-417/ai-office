@@ -77,7 +77,7 @@ describe('ProjectAnalysisSection', () => {
   });
 
   it('copies and downloads analysis history as Markdown and reports copy failure', async () => {
-    const saved = { ...result, id: 'saved', createdAt: '2026-08-25T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z', reviewStatus: 'pending', reviewNote: '' };
+    const saved = { ...result, id: 'saved', createdAt: '2026-08-25T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z', reviewStatus: 'approved', reviewNote: '' };
     localStorage.setItem('ai-office-analysis-history-v1', JSON.stringify({ version: 1, entries: [saved] }));
     const user = userEvent.setup();
     const writeText = vi.fn().mockResolvedValue(undefined);
@@ -87,7 +87,9 @@ describe('ProjectAnalysisSection', () => {
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
-    render(<ProjectAnalysisSection isStaticDemo />);
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ saved: true, filename: 'analysis.md', relativePath: 'AI OFFICE/analysis.md' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<ProjectAnalysisSection isStaticDemo={false} runtimeMode="local-ai" />);
     await user.click(screen.getByRole('button', { name: 'Markdownをコピー' }));
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining('type: "analysis-history"'));
     await user.click(screen.getByRole('button', { name: '.mdをダウンロード' }));
@@ -96,5 +98,9 @@ describe('ProjectAnalysisSection', () => {
     writeText.mockRejectedValueOnce(new Error('denied'));
     await user.click(screen.getByRole('button', { name: 'Markdownをコピー' }));
     expect(await screen.findByRole('status')).toHaveTextContent('コピーできませんでした');
+    await user.click(screen.getByRole('button', { name: 'Obsidianへ保存' }));
+    await user.click(screen.getByRole('button', { name: '保存する' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toMatchObject({ markdown: expect.stringContaining('type: "analysis-history"') });
   });
 });

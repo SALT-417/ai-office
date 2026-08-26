@@ -4,6 +4,7 @@ import { ManagerError, MAX_TASK_LENGTH, requestManagerReply, type ManagerReply }
 import { requestWork, type WorkResponse } from './work';
 import { listProjectFiles, ProjectAnalysisError, requestProjectAnalysis, type AnalysisResponse, type AnalyzeRequest, type ProjectFileInfo } from './project-analysis';
 import { isWorkCategory, type WorkCategory } from '../shared/workCategories';
+import { getObsidianSaveConfig, ObsidianSaveError, saveObsidianMarkdown, type ObsidianSaveConfig, type ObsidianSaveInput, type ObsidianSaveResult } from './obsidian';
 
 export interface AppDependencies {
   config?: ServerConfig;
@@ -11,6 +12,8 @@ export interface AppDependencies {
   workReply?: (task: string, signal?: AbortSignal, category?: WorkCategory) => Promise<WorkResponse>;
   projectFiles?: () => Promise<ProjectFileInfo[]>;
   analysisReply?: (input: AnalyzeRequest, signal?: AbortSignal) => Promise<AnalysisResponse>;
+  obsidianConfig?: ObsidianSaveConfig;
+  obsidianSave?: (input: ObsidianSaveInput, config: ObsidianSaveConfig) => Promise<ObsidianSaveResult>;
 }
 
 export function createApp(dependencies: AppDependencies = {}) {
@@ -19,10 +22,13 @@ export function createApp(dependencies: AppDependencies = {}) {
   const workReply = dependencies.workReply ?? ((task: string, signal?: AbortSignal, category: WorkCategory = 'general') => requestWork(task, config, fetch, signal, category));
   const projectFiles = dependencies.projectFiles ?? (() => listProjectFiles());
   const analysisReply = dependencies.analysisReply ?? ((input: AnalyzeRequest, signal?: AbortSignal) => requestProjectAnalysis(input, config, fetch, signal));
+  const obsidianConfig = dependencies.obsidianConfig ?? getObsidianSaveConfig();
+  const obsidianSave = dependencies.obsidianSave ?? saveObsidianMarkdown;
   const app = express();
 
   app.disable('x-powered-by');
-  app.use(express.json({ limit: '16kb', strict: true }));
+  // JSON escaping can make a valid 100KB Markdown string larger on the wire.
+  app.use(express.json({ limit: '220kb', strict: true }));
 
   app.post('/api/manager', async (request, response) => {
     const task = request.body?.task;
@@ -113,6 +119,19 @@ export function createApp(dependencies: AppDependencies = {}) {
       }
       console.error('[AI OFFICE API] Project analysis failed:', error instanceof Error ? error.message : 'Unknown error');
       response.status(500).json({ error: '分析中に問題が発生しました。時間をおいて再度お試しください。' });
+    }
+  });
+
+  app.post('/api/obsidian/save', async (request, response) => {
+    try {
+      response.json(await obsidianSave({ filename: request.body?.filename, markdown: request.body?.markdown }, obsidianConfig));
+    } catch (error) {
+      if (error instanceof ObsidianSaveError) {
+        response.status(error.status).json({ error: error.publicMessage });
+        return;
+      }
+      console.error('[AI OFFICE API] Obsidian save failed:', error instanceof Error ? error.message : 'Unknown error');
+      response.status(500).json({ error: 'Obsidian用Markdownを保存できませんでした。' });
     }
   });
 

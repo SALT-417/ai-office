@@ -6,6 +6,7 @@ import type { ReviewStatus } from '../types/history';
 import { PUBLIC_DEMO_NOTICE, publicDemoAnalysis } from '../data/publicDemo';
 import type { AppRuntimeMode } from '../utils/runtimeMode';
 import { analysisHistoryToMarkdown, createMarkdownFilename, downloadMarkdown } from '../utils/markdownExport';
+import { ObsidianSaveControl } from './ObsidianSaveControl';
 
 const categories: Array<[ProjectFileCategory, string]> = [['frontend', 'フロントエンド'], ['server', 'サーバー'], ['test', 'テスト'], ['config', '設定'], ['documentation', 'ドキュメント']];
 const severityLabels = { low: '低', medium: '中', high: '高' } as const;
@@ -27,7 +28,7 @@ function Findings({ response, isSample = false }: { response: AnalysisResponse; 
   </div>;
 }
 
-function AnalysisHistory({ history }: { history: ReturnType<typeof useAnalysisHistory> }) {
+function AnalysisHistory({ history, runtimeMode }: { history: ReturnType<typeof useAnalysisHistory>; runtimeMode: AppRuntimeMode }) {
   const [note, setNote] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<AnalysisHistoryEntry | null>(null);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
@@ -55,7 +56,7 @@ function AnalysisHistory({ history }: { history: ReturnType<typeof useAnalysisHi
     {history.entries.length === 0 ? <div className="history-empty"><span aria-hidden="true">⌕</span><h4>分析履歴はまだありません</h4><p>読み取り専用分析が完了すると自動保存されます。</p></div> : <div className="analysis-history-layout">
       <div className="history-list" aria-label="分析履歴一覧">{history.entries.map((entry) => <button type="button" className={`history-list-item ${history.selectedId === entry.id ? 'active' : ''}`} key={entry.id} onClick={() => history.select(entry.id)}><strong>{entry.objective}</strong><small>{formatDate(entry.createdAt)} · {entry.specialistName}</small><span className={`review-badge ${entry.reviewStatus}`}>{reviewLabels[entry.reviewStatus]}</span></button>)}</div>
       {selected && <div className="history-detail"><div className="history-detail-heading"><div><p className="eyebrow">READ-ONLY ANALYSIS</p><h3>{selected.objective}</h3></div><button type="button" className="history-delete-one" onClick={() => setDeleteTarget(selected)}>この分析を削除</button></div>
-        <dl className="history-meta"><div><dt>対象</dt><dd>{selected.analyzedFiles.join('、')}</dd></div><div><dt>更新</dt><dd>{formatDate(selected.updatedAt)}</dd></div></dl><button type="button" className="copy-button" onClick={() => void copy()}>分析結果をコピー</button><div className="markdown-export"><div><button type="button" className="copy-button" onClick={() => void copyMarkdown()}>Markdownをコピー</button><button type="button" className="copy-button" onClick={exportMarkdown}>.mdをダウンロード</button></div><p>Obsidianへ自動保存はしません。秘密情報や個人情報がないか、出力内容を確認してから利用してください。</p></div><Findings response={selected} />
+        <dl className="history-meta"><div><dt>対象</dt><dd>{selected.analyzedFiles.join('、')}</dd></div><div><dt>更新</dt><dd>{formatDate(selected.updatedAt)}</dd></div></dl><button type="button" className="copy-button" onClick={() => void copy()}>分析結果をコピー</button><div className="markdown-export"><div><button type="button" className="copy-button" onClick={() => void copyMarkdown()}>Markdownをコピー</button><button type="button" className="copy-button" onClick={exportMarkdown}>.mdをダウンロード</button></div><p>Obsidianへ自動保存はしません。秘密情報や個人情報がないか、出力内容を確認してから利用してください。</p><ObsidianSaveControl runtimeMode={runtimeMode} filename={createMarkdownFilename(selected)} markdown={analysisHistoryToMarkdown(selected)} targetLabel={`分析履歴「${selected.objective}」`} approved={selected.reviewStatus === 'approved'} /></div><Findings response={selected} />
         <div className="history-review"><div className="review-heading"><h4>人による確認</h4><span className={`review-badge ${selected.reviewStatus}`}>{reviewLabels[selected.reviewStatus]}</span></div><label htmlFor="analysis-review-note">確認メモ（任意）</label><textarea id="analysis-review-note" maxLength={1000} value={note} onChange={(event) => setNote(event.target.value)} rows={3} /><div className="review-actions"><button className="approve-button" type="button" onClick={() => review('approved')}>✓ 承認する</button><button className="reject-button" type="button" onClick={() => review('rejected')}>↩ 差し戻す</button></div><p>承認は状態の記録だけで、ファイル変更やコマンド実行は行いません。</p></div>
       </div>}
     </div>}
@@ -89,6 +90,6 @@ export function ProjectAnalysisSection({ isStaticDemo: staticOverride, runtimeMo
       <p className="selection-summary" aria-live="polite">選択：{selected.length}/8件 · 合計 {formatBytes(size)} / 60 KB</p>{limitError && <p role="alert" className="request-error">{limitError}</p>}
       {!confirmed ? <button type="button" className="request-submit" disabled={!canConfirm} onClick={() => setConfirmed(true)}>選択ファイルを確認</button> : <div className="analysis-confirm" role="group" aria-label="分析対象の最終確認"><h3>分析対象を確認してください</h3><p>担当：{specialist === 'sou' ? 'ソウ' : 'アキ'} ／ {selected.length}件</p><ul>{selected.map((item) => <li key={item}><code>{item}</code></li>)}</ul><button type="submit" className="request-submit" disabled={!canConfirm || analysis.status === 'loading'}>{analysis.status === 'loading' ? '分析中…' : '分析を開始'}</button></div>}
       {analysis.status === 'loading' && <div className="analysis-running" role="status"><span className="spinner" aria-hidden="true" />選択ファイルを読み取り、ローカルAIが分析しています。<button type="button" className="cancel-button" onClick={analysis.cancel}>キャンセル</button></div>}{analysis.error && <p role="alert" className="request-error">{analysis.error}</p>}
-    </form>}{isStaticDemo && sampleVisible && <Findings response={publicDemoAnalysis} isSample />}{!isStaticDemo && analysis.response && <Findings response={analysis.response} />}<p className="safety-note">AIの分析は提案です。利用前に人が根拠と内容を確認してください。承認しても自動実行されません。</p>{isStaticDemo && <p className="demo-notice"><strong>履歴は固定サンプルと分離されています。</strong> 下の一覧はこのブラウザに保存された実分析履歴だけです。サンプルの表示や承認操作は保存しません。</p>}<AnalysisHistory history={history} />
+    </form>}{isStaticDemo && sampleVisible && <Findings response={publicDemoAnalysis} isSample />}{!isStaticDemo && analysis.response && <Findings response={analysis.response} />}<p className="safety-note">AIの分析は提案です。利用前に人が根拠と内容を確認してください。承認しても自動実行されません。</p>{isStaticDemo && <p className="demo-notice"><strong>履歴は固定サンプルと分離されています。</strong> 下の一覧はこのブラウザに保存された実分析履歴だけです。サンプルの表示や承認操作は保存しません。</p>}<AnalysisHistory history={history} runtimeMode={runtimeMode ?? (isStaticDemo ? 'public-demo' : 'local-ai')} />
   </section>;
 }

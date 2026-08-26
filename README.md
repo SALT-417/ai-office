@@ -155,11 +155,25 @@ npm run dev
 
 作業履歴と分析履歴の詳細から、YAML frontmatter付きMarkdownをクリップボードへコピーするか、`.md`ファイルとしてダウンロードできます。依頼・計画・成果物、または分析目的・対象ファイル・根拠・改善案・確認方法を、Obsidianで読みやすい見出しとリストに整形します。公開版でも、そのブラウザに実履歴が保存されていれば利用できます。
 
-これは自動的なVault保存や外部連携ではありません。ブラウザのBlob URLによる手動ダウンロードだけを行い、使用後にURLを破棄します。秘密情報や個人情報が含まれる可能性があるため、Markdownの内容を確認してからObsidianへ貼り付け、または保存してください。
+コピーとダウンロードは自動的なVault保存や外部連携ではありません。ブラウザのBlob URLによる手動ダウンロードでは、使用後にURLを破棄します。秘密情報や個人情報が含まれる可能性があるため、Markdownの内容を確認してからObsidianへ貼り付け、または保存してください。
+
+### ローカル版限定のObsidian Vault保存
+
+`local-ai`では、人が「承認」した作業履歴・分析履歴に限り、確認ダイアログからMarkdownを指定Vaultへ保存できます。AIによる自動保存ではなく、利用者が「Obsidianへ保存」から対象とファイル名を確認し、「保存する」を押したときだけローカルExpressがファイルを作成します。`public-demo`ではボタンもAPI通信も無効です。
+
+PowerShellでVaultの既存フォルダと、Vault内の保存先サブフォルダを設定してから起動します。絶対パスはブラウザへ渡さず、サーバー環境変数だけで管理します。
+
+```powershell
+$env:OBSIDIAN_VAULT_DIR = "C:\Users\user\Documents\My Vault"
+$env:OBSIDIAN_EXPORT_SUBDIR = "AI OFFICE"
+npm run dev
+```
+
+`OBSIDIAN_VAULT_DIR`が未設定、または利用できない場合は保存APIが安全に停止します。`OBSIDIAN_EXPORT_SUBDIR`は未指定なら`AI OFFICE`、明示的な空文字ならVault直下です。同名ファイルは上書きせず、`-2`、`-3`の連番で保存します。保存前に秘密情報・個人情報が含まれていないか必ず確認してください。
 
 ### GitHub Pages版について
 
-[GitHub Pages版](https://salt-417.github.io/ai-office/)は明示的な `public-demo` モードです。ExpressやOllamaへ通信せず、5カテゴリそれぞれの固定テンプレートと、自分用テンプレートの保存・再利用・名前変更・削除、「サンプル計画」「サンプル成果物」と従来の「サンプル分析」を確認できます。自分用テンプレートは使用中ブラウザのlocalStorageだけへ保存されます。依頼文は入力・編集できますがAI送信ボタンは無効です。各サンプル結果には、現在AIが生成したものではないことを明記しています。
+[GitHub Pages版](https://salt-417.github.io/ai-office/)は明示的な `public-demo` モードです。Express、Ollama、Obsidian Vault保存APIへ通信せず、5カテゴリそれぞれの固定テンプレートと、自分用テンプレートの保存・再利用・名前変更・削除、「サンプル計画」「サンプル成果物」と従来の「サンプル分析」を確認できます。自分用テンプレートは使用中ブラウザのlocalStorageだけへ保存されます。依頼文は入力・編集できますがAI送信ボタンは無効です。各サンプル結果には、現在AIが生成したものではないことを明記しています。
 
 ローカルの `npm run dev` は `local-ai` モードで、固定または自分用テンプレートから選んだ依頼も編集後の文章も、カテゴリ付きでExpressとOllamaへ送信できます。テンプレートの保存操作自体はAPIを使わず、ブラウザ内だけで完結します。ViteからExpressへ `/api` をプロキシし、Ollamaによる実際の生成を利用します。実行モードは `VITE_APP_RUNTIME_MODE` で明示し、不正な値はAPI通信をしない `public-demo` へ安全に倒します。
 

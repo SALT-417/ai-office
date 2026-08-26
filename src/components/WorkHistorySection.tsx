@@ -7,6 +7,7 @@ import { SafeWorkContent } from './WorkResults';
 import type { AppRuntimeMode } from '../utils/runtimeMode';
 import { workCategoryById, type WorkCategory } from '../../shared/workCategories';
 import { createMarkdownFilename, downloadMarkdown, workHistoryToMarkdown } from '../utils/markdownExport';
+import { ObsidianSaveControl } from './ObsidianSaveControl';
 
 interface Props {
   entries: WorkHistoryEntry[];
@@ -74,7 +75,7 @@ export function WorkHistorySection({ entries, selectedEntry, storageError, onSel
         <div className="history-detail-heading"><div><p className="eyebrow">SAVED RESULT</p><h3 id="history-detail-title">履歴の詳細</h3></div><button type="button" className="history-delete-one" onClick={() => setDeleteTarget(selectedEntry.id)}>この履歴を削除</button></div>
         <dl className="history-meta"><div><dt>カテゴリ</dt><dd>{workCategoryById[selectedEntry.category].label}</dd></div><div><dt>依頼</dt><dd>{selectedEntry.task}</dd></div><div><dt>作成日時</dt><dd>{formatJapanDate(selectedEntry.createdAt)}</dd></div><div><dt>更新日時</dt><dd>{formatJapanDate(selectedEntry.updatedAt)}</dd></div></dl>
         <button type="button" className="restore-task" onClick={() => onRestoreTask(selectedEntry.task, selectedEntry.category)}>同じ依頼を入力欄へ戻す</button><p className="restore-note">カテゴリと依頼文を戻すだけで、自動送信はしません。</p>
-        <div className="markdown-export"><div><button type="button" className="copy-button" onClick={() => void copy(workHistoryToMarkdown(selectedEntry), 'Markdownをクリップボードへコピーしました。')}>Markdownをコピー</button><button type="button" className="copy-button" onClick={exportMarkdown}>.mdをダウンロード</button></div><p>Obsidianへ自動保存はしません。秘密情報や個人情報がないか、出力内容を確認してから利用してください。</p></div>
+        <div className="markdown-export"><div><button type="button" className="copy-button" onClick={() => void copy(workHistoryToMarkdown(selectedEntry), 'Markdownをクリップボードへコピーしました。')}>Markdownをコピー</button><button type="button" className="copy-button" onClick={exportMarkdown}>.mdをダウンロード</button></div><p>Obsidianへ自動保存はしません。秘密情報や個人情報がないか、出力内容を確認してから利用してください。</p><ObsidianSaveControl runtimeMode={runtimeMode ?? 'public-demo'} filename={createMarkdownFilename(selectedEntry)} markdown={workHistoryToMarkdown(selectedEntry)} targetLabel={`作業履歴「${selectedEntry.task}」`} approved={selectedEntry.reviewStatus === 'approved'} /></div>
 
         <section className="history-plan" aria-labelledby="saved-plan-title"><h4 id="saved-plan-title">保存された計画</h4><p>{selectedEntry.plan.summary}</p><ol>{selectedEntry.plan.firstActions.map((action) => <li key={action}>{action}</li>)}</ol></section>
         <section className="history-products" aria-labelledby="saved-products-title"><h4 id="saved-products-title">保存された成果物</h4>{selectedEntry.results.map((result) => {

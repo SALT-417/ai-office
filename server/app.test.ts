@@ -3,10 +3,11 @@
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { afterEach } from 'vitest';
-import { createApp } from './app';
+import { createApp, type AppDependencies } from './app';
 import { ManagerError, MAX_TASK_LENGTH, type ManagerReply } from './manager';
 import type { WorkResponse } from './work';
 import { ProjectAnalysisError, type AnalysisResponse, type AnalyzeRequest, type ProjectFileInfo } from './project-analysis';
+import { ObsidianSaveError } from './obsidian';
 
 let server: Server | undefined;
 
@@ -155,5 +156,32 @@ describe('project analysis API', () => {
     const analysisBody = await (await post(`${base}/analyze`, { objective: 'x', specialist: 'aki', files: ['src/a.ts'] })).text();
     expect(listBody).not.toContain('private'); expect(analysisBody).not.toContain('internal'); expect(analysisBody).not.toContain('stack');
     consoleError.mockRestore();
+  });
+});
+
+describe('POST /api/obsidian/save', () => {
+  async function startObsidianApi(obsidianSave: NonNullable<AppDependencies['obsidianSave']>) {
+    server = createApp({ obsidianSave, obsidianConfig: { vaultDir: 'server-only', exportSubdir: 'AI OFFICE' } }).listen(0, '127.0.0.1');
+    await new Promise<void>((resolve) => server?.once('listening', resolve));
+    const address = server.address() as AddressInfo;
+    return `http://127.0.0.1:${address.port}/api/obsidian/save`;
+  }
+
+  it('passes only filename and Markdown and returns relative save information', async () => {
+    const obsidianSave = vi.fn().mockResolvedValue({ saved: true as const, filename: 'note.md', relativePath: 'AI OFFICE/note.md' });
+    const url = await startObsidianApi(obsidianSave);
+    const response = await post(url, { filename: 'note.md', markdown: '# note', vaultPath: 'C:\\private' });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ saved: true, filename: 'note.md', relativePath: 'AI OFFICE/note.md' });
+    expect(obsidianSave).toHaveBeenCalledWith({ filename: 'note.md', markdown: '# note' }, { vaultDir: 'server-only', exportSubdir: 'AI OFFICE' });
+  });
+
+  it('returns safe public errors without absolute paths or stacks', async () => {
+    const url = await startObsidianApi(async () => { throw new ObsidianSaveError(503, 'Obsidian Vaultの保存先が設定されていません。'); });
+    const response = await post(url, { filename: 'note.md', markdown: '# note' });
+    const body = await response.text();
+    expect(response.status).toBe(503);
+    expect(body).toContain('保存先が設定されていません');
+    expect(body).not.toMatch(/[A-Z]:\\|stack/i);
   });
 });

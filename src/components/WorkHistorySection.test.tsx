@@ -133,7 +133,7 @@ describe('work history integration', () => {
 
   it('copies and downloads the selected work history as Markdown', async () => {
     const user = userEvent.setup();
-    seed([historyEntry()]);
+    seed([historyEntry('approved-export', { reviewStatus: 'approved' })]);
     const writeText = vi.fn().mockResolvedValue(undefined);
     const createObjectURL = vi.fn(() => 'blob:work-markdown');
     const revokeObjectURL = vi.fn();
@@ -141,6 +141,8 @@ describe('work history integration', () => {
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ saved: true, filename: 'work.md', relativePath: 'AI OFFICE/work.md' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
     render(<App />);
     await user.click(screen.getByRole('button', { name: 'Markdownをコピー' }));
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining('type: "work-history"'));
@@ -148,6 +150,10 @@ describe('work history integration', () => {
     expect(click).toHaveBeenCalledOnce();
     await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:work-markdown'));
     expect(await screen.findByRole('status')).toHaveTextContent('ダウンロードしました');
+    await user.click(screen.getByRole('button', { name: 'Obsidianへ保存' }));
+    await user.click(screen.getByRole('button', { name: '保存する' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toMatchObject({ markdown: expect.stringContaining('type: "work-history"') });
   });
 
   it('keeps the current result visible and reports storage quota errors', async () => {
