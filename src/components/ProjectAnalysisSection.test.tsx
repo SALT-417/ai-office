@@ -99,8 +99,10 @@ describe('ProjectAnalysisSection', () => {
     await user.click(screen.getByRole('button', { name: 'Markdownをコピー' }));
     expect(await screen.findByRole('status')).toHaveTextContent('コピーできませんでした');
     await user.click(screen.getByRole('button', { name: 'Obsidianへ保存' }));
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('AI OFFICE / 分析');
     await user.click(screen.getByRole('button', { name: '保存する' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
-    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toMatchObject({ markdown: expect.stringContaining('type: "analysis-history"') });
+    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toMatchObject({ markdown: expect.stringContaining('type: "analysis-history"'), entryType: 'analysis' });
+    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).not.toHaveProperty('category');
   });
 });

@@ -169,7 +169,15 @@ $env:OBSIDIAN_EXPORT_SUBDIR = "AI OFFICE"
 npm run dev
 ```
 
-`OBSIDIAN_VAULT_DIR`が未設定、または利用できない場合は保存APIが安全に停止します。`OBSIDIAN_EXPORT_SUBDIR`は未指定なら`AI OFFICE`、明示的な空文字ならVault直下です。同名ファイルは上書きせず、`-2`、`-3`の連番で保存します。保存前に秘密情報・個人情報が含まれていないか必ず確認してください。
+`OBSIDIAN_VAULT_DIR`が未設定、または利用できない場合は保存APIが安全に停止します。`OBSIDIAN_EXPORT_SUBDIR`は未指定なら`AI OFFICE`、明示的な空文字ならVault直下です。その下に、作業履歴はカテゴリ別の`一般業務`、`AI学習`、`開発`、`転職・キャリア`、`コンテンツ`、分析履歴は`分析`フォルダをサーバー側の固定ルールで作成します。ブラウザから任意のフォルダ名は指定できません。
+
+保存例：
+
+- `AI OFFICE/一般業務/20260826_043000_AI_OFFICE_work_general.md`
+- `AI OFFICE/開発/20260826_050000_AI_OFFICE_work_development.md`
+- `AI OFFICE/分析/20260826_060000_AI_OFFICE_analysis_aki.md`
+
+同名ファイルは各カテゴリフォルダ内で上書きせず、`-2`、`-3`の連番で保存します。保存前に秘密情報・個人情報が含まれていないか必ず確認してください。
 
 ### GitHub Pages版について
 

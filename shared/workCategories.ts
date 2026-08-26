@@ -11,6 +11,14 @@ export const WORK_CATEGORIES = [
 export const WORK_CATEGORY_IDS = WORK_CATEGORIES.map((category) => category.id);
 export const workCategoryById = Object.fromEntries(WORK_CATEGORIES.map((category) => [category.id, category])) as Record<WorkCategory, (typeof WORK_CATEGORIES)[number]>;
 
+export const OBSIDIAN_CATEGORY_FOLDER_BY_ID: Record<WorkCategory, string> = {
+  general: '一般業務',
+  learning: 'AI学習',
+  development: '開発',
+  career: '転職・キャリア',
+  content: 'コンテンツ',
+};
+
 export function isWorkCategory(value: unknown): value is WorkCategory {
   return typeof value === 'string' && WORK_CATEGORY_IDS.includes(value as WorkCategory);
 }

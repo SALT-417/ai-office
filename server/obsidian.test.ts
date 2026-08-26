@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promis
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { MAX_OBSIDIAN_MARKDOWN_BYTES, ObsidianSaveError, saveObsidianMarkdown } from './obsidian';
+import { MAX_OBSIDIAN_MARKDOWN_BYTES, ObsidianSaveError, saveObsidianMarkdown, type ObsidianSaveInput } from './obsidian';
 
 const cleanup: string[] = [];
 
@@ -45,6 +45,38 @@ describe('Obsidian Vault save safety', () => {
     expect(second).toEqual({ saved: true, filename: 'note-2.md', relativePath: 'AI OFFICE/note-2.md' });
     expect(await readFile(path.join(vaultDir, 'AI OFFICE', 'note.md'), 'utf8')).toBe('# first');
     expect(await readFile(path.join(vaultDir, 'AI OFFICE', 'note-2.md'), 'utf8')).toBe('# second');
+  });
+
+  it.each([
+    ['general', '一般業務'],
+    ['development', '開発'],
+  ] as const)('saves work/%s in the fixed %s folder', async (category, folder) => {
+    const vaultDir = await temporaryDirectory('ai-office-vault-');
+    const saved = await saveObsidianMarkdown({ filename: 'work.md', markdown: '# work', entryType: 'work', category }, { vaultDir, exportSubdir: 'AI OFFICE' });
+    expect(saved.relativePath).toBe(`AI OFFICE/${folder}/work.md`);
+    expect(await readFile(path.join(vaultDir, 'AI OFFICE', folder, 'work.md'), 'utf8')).toBe('# work');
+  });
+
+  it('saves analysis in the fixed analysis folder and ignores category or arbitrary folder input', async () => {
+    const vaultDir = await temporaryDirectory('ai-office-vault-');
+    const saved = await saveObsidianMarkdown({ filename: 'analysis.md', markdown: '# analysis', entryType: 'analysis', category: 'not-a-category', folder: '../../outside' } as ObsidianSaveInput & { folder: string }, { vaultDir });
+    expect(saved.relativePath).toBe('AI OFFICE/分析/analysis.md');
+    expect(saved.relativePath).not.toContain('outside');
+  });
+
+  it('rejects missing or invalid categories for work and invalid entry types', async () => {
+    const vaultDir = await temporaryDirectory('ai-office-vault-');
+    await expect(saveObsidianMarkdown({ filename: 'work.md', markdown: '# work', entryType: 'work' }, { vaultDir })).rejects.toMatchObject({ status: 400 });
+    await expect(saveObsidianMarkdown({ filename: 'work.md', markdown: '# work', entryType: 'work', category: 'unknown' }, { vaultDir })).rejects.toMatchObject({ status: 400 });
+    await expect(saveObsidianMarkdown({ filename: 'work.md', markdown: '# work', entryType: 'other' }, { vaultDir })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('increments filenames inside the category folder', async () => {
+    const vaultDir = await temporaryDirectory('ai-office-vault-');
+    const input = { filename: 'work.md', markdown: '# work', entryType: 'work', category: 'development' };
+    await saveObsidianMarkdown(input, { vaultDir });
+    const second = await saveObsidianMarkdown(input, { vaultDir });
+    expect(second.relativePath).toBe('AI OFFICE/開発/work-2.md');
   });
 
   it('rejects a symlink or junction that escapes the Vault', async () => {

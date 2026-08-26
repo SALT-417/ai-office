@@ -5,3 +5,5 @@ export interface ObsidianSaveResponse {
 }
 
 export type ObsidianSaveStatus = 'idle' | 'loading' | 'success' | 'error';
+
+export type ObsidianEntryType = 'work' | 'analysis';

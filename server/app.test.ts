@@ -173,7 +173,7 @@ describe('POST /api/obsidian/save', () => {
     const response = await post(url, { filename: 'note.md', markdown: '# note', vaultPath: 'C:\\private' });
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ saved: true, filename: 'note.md', relativePath: 'AI OFFICE/note.md' });
-    expect(obsidianSave).toHaveBeenCalledWith({ filename: 'note.md', markdown: '# note' }, { vaultDir: 'server-only', exportSubdir: 'AI OFFICE' });
+    expect(obsidianSave).toHaveBeenCalledWith({ filename: 'note.md', markdown: '# note', entryType: undefined, category: undefined }, { vaultDir: 'server-only', exportSubdir: 'AI OFFICE' });
   });
 
   it('returns safe public errors without absolute paths or stacks', async () => {

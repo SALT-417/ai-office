@@ -151,9 +151,10 @@ describe('work history integration', () => {
     await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:work-markdown'));
     expect(await screen.findByRole('status')).toHaveTextContent('ダウンロードしました');
     await user.click(screen.getByRole('button', { name: 'Obsidianへ保存' }));
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('AI OFFICE / 開発');
     await user.click(screen.getByRole('button', { name: '保存する' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
-    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toMatchObject({ markdown: expect.stringContaining('type: "work-history"') });
+    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toMatchObject({ markdown: expect.stringContaining('type: "work-history"'), entryType: 'work', category: 'development' });
   });
 
   it('keeps the current result visible and reports storage quota errors', async () => {

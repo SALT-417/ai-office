@@ -1,5 +1,6 @@
 import { lstat, mkdir, realpath, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { isWorkCategory, OBSIDIAN_CATEGORY_FOLDER_BY_ID } from '../shared/workCategories';
 
 export const MAX_OBSIDIAN_MARKDOWN_BYTES = 100 * 1024;
 const MAX_FILENAME_LENGTH = 180;
@@ -8,7 +9,11 @@ const WINDOWS_FORBIDDEN = /[<>:"|?*]/;
 export interface ObsidianSaveInput {
   filename: unknown;
   markdown: unknown;
+  entryType?: unknown;
+  category?: unknown;
 }
+
+export type ObsidianEntryType = 'work' | 'analysis';
 
 export interface ObsidianSaveResult {
   saved: true;
@@ -59,6 +64,14 @@ function subdirectoryParts(value: string | undefined): string[] {
   return parts;
 }
 
+function entrySubdirectory(input: ObsidianSaveInput): string[] {
+  if (input.entryType === undefined) return [];
+  if (input.entryType === 'analysis') return ['分析'];
+  if (input.entryType !== 'work') throw new ObsidianSaveError(400, 'entryTypeの値が正しくありません。');
+  if (!isWorkCategory(input.category)) throw new ObsidianSaveError(400, '作業履歴のcategoryが正しくありません。');
+  return [OBSIDIAN_CATEGORY_FOLDER_BY_ID[input.category]];
+}
+
 async function safeExportDirectory(root: string, parts: string[]): Promise<string> {
   let current = root;
   for (const part of parts) {
@@ -99,7 +112,7 @@ export async function saveObsidianMarkdown(input: ObsidianSaveInput, config: Obs
     throw new ObsidianSaveError(503, 'Obsidian Vaultの保存先を利用できません。設定を確認してください。');
   }
 
-  const parts = subdirectoryParts(config.exportSubdir);
+  const parts = [...subdirectoryParts(config.exportSubdir), ...entrySubdirectory(input)];
   let exportDirectory: string;
   try {
     exportDirectory = await safeExportDirectory(vaultRoot, parts);

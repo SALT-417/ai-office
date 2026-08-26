@@ -5,7 +5,7 @@ import { ObsidianSaveControl } from './ObsidianSaveControl';
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-const props = { filename: '20260826_AI_OFFICE_work.md', markdown: '---\nsource: AI OFFICE\n---', targetLabel: '作業履歴「確認」', approved: true };
+const props = { filename: '20260826_AI_OFFICE_work.md', markdown: '---\nsource: AI OFFICE\n---', targetLabel: '作業履歴「確認」', approved: true, entryType: 'work' as const, category: 'development' as const, destinationLabel: 'AI OFFICE / 開発' };
 
 describe('ObsidianSaveControl', () => {
   it('is completely hidden in public-demo and never calls the API', () => {
@@ -26,6 +26,7 @@ describe('ObsidianSaveControl', () => {
     await user.click(screen.getByRole('button', { name: 'Obsidianへ保存' }));
     expect(screen.getByRole('alertdialog')).toHaveTextContent(props.targetLabel);
     expect(screen.getByRole('alertdialog')).toHaveTextContent(props.filename);
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('AI OFFICE / 開発');
     await user.click(screen.getByRole('button', { name: 'キャンセル' }));
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
@@ -41,7 +42,7 @@ describe('ObsidianSaveControl', () => {
     const confirm = screen.getByRole('button', { name: '保存する' });
     await user.dblClick(confirm);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith('/api/obsidian/save', expect.objectContaining({ body: JSON.stringify({ filename: props.filename, markdown: props.markdown }) }));
+    expect(fetchMock).toHaveBeenCalledWith('/api/obsidian/save', expect.objectContaining({ body: JSON.stringify({ filename: props.filename, markdown: props.markdown, entryType: 'work', category: 'development' }) }));
     expect(screen.getByRole('button', { name: 'Obsidianへ保存中…' })).toBeDisabled();
     resolveRequest(new Response(JSON.stringify({ saved: true, filename: props.filename, relativePath: `AI OFFICE/${props.filename}` }), { status: 200 }));
     expect(await screen.findByRole('status')).toHaveTextContent(`AI OFFICE/${props.filename}`);

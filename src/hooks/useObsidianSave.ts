@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ObsidianSaveResponse, ObsidianSaveStatus } from '../types/obsidian';
+import type { ObsidianEntryType, ObsidianSaveResponse, ObsidianSaveStatus } from '../types/obsidian';
+import type { WorkCategory } from '../../shared/workCategories';
 import type { AppRuntimeMode } from '../utils/runtimeMode';
 
 const TIMEOUT_MS = 35_000;
@@ -37,7 +38,7 @@ export function useObsidianSave(runtimeMode: AppRuntimeMode) {
     return () => { mountedRef.current = false; controllerRef.current?.abort(); };
   }, []);
 
-  const save = async (filename: string, markdown: string) => {
+  const save = async (filename: string, markdown: string, entryType: ObsidianEntryType, category?: WorkCategory) => {
     if (runtimeMode !== 'local-ai' || inFlightRef.current) return;
     inFlightRef.current = true;
     controllerRef.current?.abort();
@@ -50,7 +51,7 @@ export function useObsidianSave(runtimeMode: AppRuntimeMode) {
       const response = await fetch('/api/obsidian/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename, markdown }),
+        body: JSON.stringify({ filename, markdown, entryType, ...(entryType === 'work' ? { category } : {}) }),
         signal: controller.signal,
       });
       const body: unknown = await response.json().catch(() => null);
