@@ -121,14 +121,22 @@ export function MiniatureOfficeScene({ mode, selectedId, progress, onSelect, man
     <div className="scene-status miniature-status"><span className="live-dot" /><strong>{activeMode.time}</strong><span id="miniature-scene-status">ミニチュア表示・{activeMode.status}</span><span className="miniature-motion-control"><small className="miniature-motion-note">{motionStatus}</small><button type="button" role="switch" aria-checked={motionEnabled} onClick={toggleMotion}>自律移動 {motionEnabled ? 'ON' : 'OFF'}</button></span></div>
     {reducedMotion && motionEnabled && <p className="motion-override-note">OSの動き軽減設定中ですが、手動で移動ONにしています。</p>}
     <div className={`miniature-office${reducedMotion && motionEnabled ? ' motion-forced' : ''}`} data-mode={mode} data-motion={motionEnabled ? 'on' : 'off'}>
-      <div className="miniature-wall miniature-wall-left" aria-hidden="true" />
-      <div className="miniature-wall miniature-wall-back" aria-hidden="true"><span>AI OFFICE</span><i className="miniature-window" /></div>
-      <div className="miniature-floor" aria-hidden="true"><i className="mini-floor-inlay" /></div>
+      <div className="miniature-wall miniature-wall-left" aria-hidden="true"><i className="mini-wall-light wall-light-left" /></div>
+      <div className="miniature-wall miniature-wall-back" aria-hidden="true">
+        <span className="mini-office-sign">AI OFFICE</span>
+        <i className="mini-wall-light wall-light-back" />
+        <span className="mini-status-monitor"><strong>TEAM STATUS</strong><i><b /><b /><b /></i><small>SYSTEM ONLINE</small></span>
+        <i className="mini-whiteboard" />
+        <i className="miniature-window" />
+      </div>
+      <div className="miniature-floor" aria-hidden="true">
+        <i className="mini-floor-zone floor-zone-work" /><i className="mini-floor-zone floor-zone-meeting" /><i className="mini-floor-zone floor-zone-lounge" /><i className="mini-floor-aisle" />
+      </div>
       <div className="miniature-furniture" aria-hidden="true">
         <span className="mini-zone-label zone-library">資料棚</span><span className="mini-zone-label zone-meeting">会議エリア</span><span className="mini-zone-label zone-work">作業席</span><span className="mini-zone-label zone-lounge">ラウンジ</span>
         <i className="mini-desk desk-one" /><i className="mini-desk desk-two" /><i className="mini-desk desk-three" /><i className="mini-desk desk-four" /><i className="mini-desk desk-five" />
         <i className="mini-chair chair-one" /><i className="mini-chair chair-two" /><i className="mini-chair chair-three" /><i className="mini-chair chair-four" /><i className="mini-chair chair-five" />
-        <i className="mini-meeting-table" /><i className="mini-sofa sofa-two" /><i className="mini-sofa sofa-one" /><i className="mini-shelf" /><i className="mini-agent-console" /><i className="mini-plant plant-one" /><i className="mini-plant plant-two" /><i className="mini-plant plant-three" />
+        <i className="mini-meeting-table"><b /><b /><b /></i><i className="mini-side-table" /><i className="mini-sofa sofa-two" /><i className="mini-sofa sofa-one" /><i className="mini-shelf" /><i className="mini-agent-console" /><i className="mini-plant plant-one" /><i className="mini-plant plant-two" /><i className="mini-plant plant-three" />
       </div>
       <div className="miniature-night" aria-hidden="true" />
       {employees.map((employee) => {

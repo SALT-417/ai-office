@@ -4,7 +4,7 @@ export interface MiniaturePoint { x: number; y: number; zone: string }
 export type MiniaturePointId = 'desk-ren' | 'desk-mio' | 'desk-sou' | 'desk-yuna' | 'desk-aki' | 'aisle-left' | 'aisle-center' | 'aisle-right' | 'aisle-front' | 'aisle-back' | 'meeting-ren' | 'meeting-mio' | 'meeting-sou' | 'meeting-yuna' | 'meeting-aki' | 'lounge-ren' | 'lounge-mio' | 'lounge-sou' | 'lounge-yuna' | 'lounge-aki' | 'shelf' | 'center' | 'standby-left' | 'standby-right';
 
 export const miniaturePoints: Record<MiniaturePointId, MiniaturePoint> = {
-  'desk-ren': { x: 66, y: 28, zone: '自席' }, 'desk-mio': { x: 81, y: 34, zone: '自席' }, 'desk-sou': { x: 70, y: 48, zone: '自席' }, 'desk-yuna': { x: 84, y: 55, zone: '自席' }, 'desk-aki': { x: 74, y: 67, zone: '自席' },
+  'desk-ren': { x: 34, y: 31, zone: '自席' }, 'desk-mio': { x: 54, y: 27, zone: '自席' }, 'desk-sou': { x: 74, y: 34, zone: '自席' }, 'desk-yuna': { x: 43, y: 63, zone: '自席' }, 'desk-aki': { x: 66, y: 65, zone: '自席' },
   'aisle-left': { x: 27, y: 48, zone: '通路' }, 'aisle-center': { x: 49, y: 51, zone: '通路' }, 'aisle-right': { x: 67, y: 57, zone: '通路' }, 'aisle-front': { x: 48, y: 72, zone: '通路' }, 'aisle-back': { x: 44, y: 33, zone: '通路' },
   'meeting-ren': { x: 39, y: 45, zone: '会議席' }, 'meeting-mio': { x: 48, y: 38, zone: '会議席' }, 'meeting-sou': { x: 57, y: 45, zone: '会議席' }, 'meeting-yuna': { x: 50, y: 57, zone: '会議席' }, 'meeting-aki': { x: 40, y: 56, zone: '会議席' },
   'lounge-ren': { x: 27, y: 70, zone: 'ラウンジ' }, 'lounge-mio': { x: 37, y: 67, zone: 'ラウンジ' }, 'lounge-sou': { x: 20, y: 77, zone: 'ラウンジ' }, 'lounge-yuna': { x: 32, y: 80, zone: 'ラウンジ' }, 'lounge-aki': { x: 44, y: 76, zone: 'ラウンジ' },

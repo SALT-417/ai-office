@@ -172,6 +172,26 @@ describe('OfficeView', () => {
     expect(screen.getByText('ラウンジ')).toBeInTheDocument();
     expect(screen.getByText('資料棚')).toBeInTheDocument();
     expect(screen.getAllByText('AI OFFICE').length).toBeGreaterThan(0);
+    expect(document.querySelector('.mini-status-monitor')).toHaveTextContent('TEAM STATUS');
+    expect(document.querySelector('.mini-status-monitor')).toHaveTextContent('SYSTEM ONLINE');
+    expect(document.querySelector('.mini-whiteboard')).toBeInTheDocument();
+    expect(document.querySelectorAll('.mini-floor-zone')).toHaveLength(3);
+    expect(document.querySelector('.mini-floor-aisle')).toBeInTheDocument();
+    expect(document.querySelector('.mini-side-table')).toBeInTheDocument();
+  });
+
+  it('業務モードの5席を上段3席・下段2席へ分散する', () => {
+    render(<OfficeView {...baseProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'ミニチュア' }));
+    const expected = {
+      ren: ['34%', '31%'], mio: ['54%', '27%'], sou: ['74%', '34%'],
+      yuna: ['43%', '63%'], aki: ['66%', '65%'],
+    } as const;
+    Object.entries(expected).forEach(([id, [x, y]]) => {
+      const employee = document.querySelector(`.miniature-${id}`) as HTMLElement;
+      expect(employee.style.getPropertyValue('--mini-x')).toBe(x);
+      expect(employee.style.getPropertyValue('--mini-y')).toBe(y);
+    });
   });
 
   it('アンマウント時に自律移動タイマーを解除する', () => {
